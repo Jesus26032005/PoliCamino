@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+	<rss version="2.0" xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#">
+	<channel>
+	<title>Últimos sismos registrados por el SSN</title>
+		<link>http://www.ssn.unam.mx</link>
+		<description>Reporte de los últimos sismos en México</description>
+		<item>
+			<title>3.8, 41 km al SUR de  PETATLAN, GRO</title>
+			<description><![CDATA[ <p>Fecha:2026-11-13 04:51:09 (Hora de M&eacute;xico)<br/>Lat/Lon: 17.168/-101.345<br/>Profundidad: 5.0 km </p> ]]></description>
+			<link><![CDATA[ http://www2.ssn.unam.mx:8080/jsp/localizacion-de-sismo.jsp?latitud=17.168&longitud=-101.345&prf=5.0 km&ma=3.8&fecha=2026-11-13&hora=04:51:09&loc=41 km al SUR de  PETATLAN, GRO&evento=1 ]]></link>
+			<geo:lat>17.168</geo:lat>
+			<geo:long>-101.345</geo:long>
+		</item>
+<item>
+			<title>3.0, 48 km al NORESTE de  PETATLAN, GRO</title>
+			<description><![CDATA[ <p>Fecha:2026-11-13 04:40:43 (Hora de M&eacute;xico)<br/>Lat/Lon: 17.87/-100.991<br/>Profundidad: 9.6 km </p> ]]></description>
+			<link><![CDATA[ http://www2.ssn.unam.mx:8080/jsp/localizacion-de-sismo.jsp?latitud=17.87&longitud=-100.991&prf=9.6 km&ma=3.0&fecha=2026-11-13&hora=04:40:43&loc=48 km al NORESTE de  PETATLAN, GRO&evento=1 ]]></link>
+			<geo:lat>17.87</geo:lat>
+			<geo:long>-100.991</geo:long>
+		</item>
+<item>
+			<title>3.3, 23 km al SUROESTE de  COYUCA DE BENITEZ, GRO</title>
+			<description><![CDATA[ <p>Fecha:2026-11-13 04:33:42 (Hora de M&eacute;xico)<br/>Lat/Lon: 16.934/-100.286<br/>Profundidad: 22.1 km </p> ]]></description>
+			<link><![CDATA[ http://www2.ssn.unam.mx:8080/jsp/localizacion-de-sismo.jsp?latitud=16.934&longitud=-100.286&prf=22.1 km&ma=3.3&fecha=2026-11-13&hora=04:33:42&loc=23 km al SUROESTE de  COYUCA DE BENITEZ, GRO&evento=1 ]]></link>
+			<geo:lat>16.934</geo:lat>
+			<geo:long>-100.286</geo:long>
+		</item>
+<item>
+			<title>2.8, 14 km al NOROESTE de  VILLA DE ALVAREZ, COL</title>
+			<description><![CDATA[ <p>Fecha:2026-11-13 03:29:24 (Hora de M&eacute;xico)<br/>Lat/Lon: 19.366/-103.812<br/>Profundidad: 35.1 km </p> ]]></description>
+			<link><![CDATA[ http://www2.ssn.unam.mx:8080/jsp/localizacion-de-sismo.jsp?latitud=19.366&longitud=-103.812&prf=35.1 km&ma=2.8&fecha=2026-11-13&hora=03:29:24&loc=14 km al NOROESTE de  VILLA DE ALVAREZ, COL&evento=1 ]]></link>
+			<geo:lat>19.366</geo:lat>
+			<geo:long>-103.812</geo:long>
+		</item>
+</channel>
+</rss>

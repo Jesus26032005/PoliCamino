@@ -22,7 +22,7 @@ npm run build      # build de producción
 - `src/features/`: funciones por dominio (mapa, búsqueda...).
 - `src/data/`: datos en JSON (lugares por campus).
 
-Estado: Fase 3 (accesos, transporte cercano y ruta a pie).
+Estado: Fase 4 (tarjeta «Hoy en el campus»: clima, aire y sismos).
 
 ## Datos
 
@@ -35,3 +35,15 @@ Todo lo importado entra con `verificado: false`. Datos © colaboradores de OpenS
   Ojo: reimportar sobrescribe `src/data/zacatenco.lugares.json`; si ya corregiste datos a mano, haz un respaldo.
 - Rutas a pie: OSRM de FOSSGIS (`https://routing.openstreetmap.de/routed-foot`). Política: máx. 1 petición/s,
   sin uso masivo, atribución y enlace "Corregir el mapa". Las coordenadas de origen y destino se envían a ese servidor.
+
+## Datos en vivo (Fase 4)
+
+| Dato             | Fuente                                | Notas                                                                                          |
+| ---------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Clima            | [Open-Meteo](https://open-meteo.com/) | Gratis para uso no comercial (CC BY 4.0, atribución obligatoria). Caché 10 min.                |
+| Calidad del aire | Open-Meteo, modelo CAMS (Copernicus)  | Estimación de modelo global (~45 km), no una estación. AQI de EE. UU., no IMECA. Caché 30 min. |
+| Sismos           | Servicio Sismológico Nacional (RSS)   | El SSN solo ofrece HTTP y sin CORS: se lee a través de `/api/sismos`. Caché 5 min.             |
+
+`/api/sismos` es un proxy mínimo: en desarrollo lo hace Vite (`vite.config.ts`); en producción,
+la función `api/sismos.ts` (formato Vercel Functions, **aún no probada desplegada**). Sin ella, la tarjeta
+muestra el error de sismos y el resto sigue funcionando.

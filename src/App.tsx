@@ -6,6 +6,8 @@ import { HojaInferior } from './components/HojaInferior'
 import { NoticeBanner } from './components/NoticeBanner'
 import { CAMPUS, CAMPUS_INICIAL } from './data/campus'
 import { DetalleLugar } from './features/lugares/DetalleLugar'
+import { TarjetaHoy } from './features/envivo/TarjetaHoy'
+import { useEnVivo } from './features/envivo/useEnVivo'
 import { Mapa } from './features/mapa/Mapa'
 import {
   PanelRuta,
@@ -21,6 +23,7 @@ import { busquedaConLugar, leerLugarDeUrl } from './lib/enlaces'
 import { dentroDeLimites } from './lib/geo'
 import { cargarLugares } from './lib/lugares'
 import { formatearDistancia, formatearDuracion, rutaAGeoJSON } from './lib/ruta'
+import { descripcionClima } from './lib/envivo'
 import { CATEGORIAS, type Categoria, type Lugar } from './lib/tipos'
 
 type Estado =
@@ -34,6 +37,8 @@ export default function App() {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null)
   const [activas, setActivas] = useState<ReadonlySet<Categoria>>(new Set())
   const ubic = useUbicacion()
+  const enVivo = useEnVivo(campus.centro)
+  const [hoyAbierto, setHoyAbierto] = useState(false)
 
   // Cómo llegar: panel, origen, destino y ruta a pie.
   const [panelAbierto, setPanelAbierto] = useState(false)
@@ -108,11 +113,15 @@ export default function App() {
     // Si el filtro ocultaba ese lugar, se quita para que se vea en el mapa.
     if (activas.size > 0 && !activas.has(l.categoria)) setActivas(new Set())
     setPanelAbierto(false)
+    setHoyAbierto(false)
     elegir(l.id)
   }
 
   function alSeleccionarEnMapa(id: string | null) {
-    if (id) setPanelAbierto(false)
+    if (id) {
+      setPanelAbierto(false)
+      setHoyAbierto(false)
+    }
     elegir(id)
   }
 
@@ -146,18 +155,36 @@ export default function App() {
       <header className="flex items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2">
         <div className="flex items-baseline gap-2">
           <h1 className="text-body font-bold text-primary">{APP_NAME}</h1>
-          <span className="text-small text-muted">{campus.nombre}</span>
+          <span className="hidden text-small text-muted sm:inline">{campus.nombre}</span>
         </div>
-        <Boton
-          onClick={() => {
-            setPestana(destino || origen ? 'ruta' : 'llegar')
-            setPanelAbierto(true)
-          }}
-          aria-expanded={panelAbierto}
-          className="min-h-touch"
-        >
-          Cómo llegar
-        </Boton>
+        <div className="flex items-center gap-2">
+          <Boton
+            onClick={() => {
+              setPanelAbierto(false)
+              setHoyAbierto((a) => !a)
+            }}
+            aria-expanded={hoyAbierto}
+            aria-label={
+              enVivo.clima.estado.fase === 'listo'
+                ? `Hoy en el campus: ${Math.round(enVivo.clima.estado.datos.temperaturaC)} grados, ${descripcionClima(enVivo.clima.estado.datos.codigo)}`
+                : 'Hoy en el campus'
+            }
+          >
+            {enVivo.clima.estado.fase === 'listo'
+              ? `Hoy ${Math.round(enVivo.clima.estado.datos.temperaturaC)}°`
+              : 'Hoy'}
+          </Boton>
+          <Boton
+            onClick={() => {
+              setHoyAbierto(false)
+              setPestana(destino || origen ? 'ruta' : 'llegar')
+              setPanelAbierto(true)
+            }}
+            aria-expanded={panelAbierto}
+          >
+            Cómo llegar
+          </Boton>
+        </div>
       </header>
       <NoticeBanner compacto />
 
@@ -246,7 +273,7 @@ export default function App() {
             Mostrando {visibles.length} de {lugares.length} lugares
           </p>
         )}
-        {rutaCalculada && !panelAbierto && !seleccionado && (
+        {rutaCalculada && !panelAbierto && !hoyAbierto && !seleccionado && (
           <div className="absolute bottom-3 right-3 flex items-center gap-2 rounded-control border border-border bg-surface p-2 shadow-sheet">
             <span role="status" className="px-2 text-small">
               Ruta: {formatearDistancia(rutaCalculada.distanciaM)} ·{' '}
@@ -257,7 +284,11 @@ export default function App() {
             </Boton>
           </div>
         )}
-        {panelAbierto ? (
+        {hoyAbierto ? (
+          <HojaInferior titulo="Hoy en el campus" onCerrar={() => setHoyAbierto(false)}>
+            <TarjetaHoy datos={enVivo} centro={campus.centro} />
+          </HojaInferior>
+        ) : panelAbierto ? (
           <HojaInferior titulo="Cómo llegar" onCerrar={() => setPanelAbierto(false)}>
             <PanelRuta
               lugares={lugares}
