@@ -20,6 +20,7 @@
   --c-notice-bg: #fff4d6;
   --c-notice-text: #5c3d00;
   --c-focus: #1d4ed8;
+  --c-user: #1d4ed8;
 
   /* Colores de categoría (iguales en ambos temas; ícono blanco encima). */
   --c-cat-escuela: #2563eb;
@@ -48,6 +49,7 @@
     --c-notice-bg: #3a2c0a;
     --c-notice-text: #ffe9ad;
     --c-focus: #93b4ff;
+    --c-user: #93b4ff;
   }
 }
 
@@ -63,6 +65,7 @@
   --c-notice-bg: #3a2c0a;
   --c-notice-text: #ffe9ad;
   --c-focus: #93b4ff;
+  --c-user: #93b4ff;
 }
 
 /* 2) Tokens que Tailwind expone como utilidades */

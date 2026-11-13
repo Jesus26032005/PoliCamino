@@ -14,12 +14,18 @@ type Props = {
 export function HojaInferior({ titulo, onCerrar, children }: Props) {
   const tituloRef = useRef<HTMLHeadingElement>(null)
 
+  // El callback se guarda en una ref para no repetir el efecto (y el foco) en cada render.
+  const cerrarRef = useRef(onCerrar)
+  useEffect(() => {
+    cerrarRef.current = onCerrar
+  })
+
   useEffect(() => {
     tituloRef.current?.focus()
-    const alTeclear = (e: KeyboardEvent) => e.key === 'Escape' && onCerrar()
+    const alTeclear = (e: KeyboardEvent) => e.key === 'Escape' && cerrarRef.current()
     window.addEventListener('keydown', alTeclear)
     return () => window.removeEventListener('keydown', alTeclear)
-  }, [onCerrar])
+  }, [])
 
   return (
     <section

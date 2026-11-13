@@ -1,4 +1,5 @@
 import { ChipCategoria } from '../../components/ChipCategoria'
+import { CompartirLugar } from './CompartirLugar'
 import type { Lugar } from '../../lib/tipos'
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor?: string }) {
@@ -43,6 +44,7 @@ export function DetalleLugar({ lugar }: { lugar: Lugar }) {
         </p>
       )}
       {lugar.fuente && <p className="text-small text-muted">Fuente: {lugar.fuente}</p>}
+      <CompartirLugar lugar={lugar} />
     </>
   )
 }

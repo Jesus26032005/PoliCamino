@@ -20,3 +20,13 @@
 .maplibregl-ctrl-top-left {
   max-width: calc(100% - 3.5rem);
 }
+
+/* Punto azul de "¿Dónde estoy?" */
+.punto-usuario {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--c-user);
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--c-user) 30%, transparent);
+}

@@ -1,15 +1,18 @@
 import {
   AttributionControl,
   Map as MapaGL,
+  Marker,
   NavigationControl,
   type GeoJSONSource,
 } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef } from 'react'
 import limiteZacatenco from '../../data/zacatenco.limite.json'
+import { dentroDeLimites } from '../../lib/geo'
 import { lugaresAGeoJSON } from '../../lib/lugares'
 import { leerToken, useTemaOscuro } from '../../lib/tema'
 import type { Campus, Lugar } from '../../lib/tipos'
+import type { Ubicacion } from '../ubicacion/useUbicacion'
 import { registrarIconos } from './iconos'
 
 const ESTILO_CLARO = 'https://tiles.openfreemap.org/styles/positron'
@@ -31,9 +34,11 @@ const LIMITE = 'campus-limite'
 
 type Props = {
   campus: Campus
+  /** Lugares visibles (ya filtrados). */
   lugares: Lugar[]
-  seleccionadoId: string | null
+  seleccionado: Lugar | null
   onSeleccionar: (id: string | null) => void
+  ubicacion: Ubicacion | null
 }
 
 const tamanoIcono = (seleccionadoId: string | null) =>
@@ -101,7 +106,8 @@ function instalarCapas(map: MapaGL, lugares: Lugar[], seleccionadoId: string | n
   })
 }
 
-export function Mapa({ campus, lugares, seleccionadoId, onSeleccionar }: Props) {
+export function Mapa({ campus, lugares, seleccionado, onSeleccionar, ubicacion }: Props) {
+  const seleccionadoId = seleccionado?.id ?? null
   const contenedor = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapaGL | null>(null)
   const oscuro = useTemaOscuro()
@@ -179,15 +185,51 @@ export function Mapa({ campus, lugares, seleccionadoId, onSeleccionar }: Props) 
     mapRef.current?.setStyle(oscuro ? ESTILO_OSCURO : ESTILO_CLARO)
   }, [oscuro])
 
-  // Lugar seleccionado: agranda su ícono y centra el mapa sobre él.
+  // Filtros: al cambiar los lugares visibles se actualiza la fuente del mapa.
+  // (Cubre también el caso en que los datos llegan después de crearse el mapa.)
+  useEffect(() => {
+    const fuente = mapRef.current?.getSource(FUENTE) as GeoJSONSource | undefined
+    fuente?.setData(lugaresAGeoJSON(lugares) as never)
+  }, [lugares])
+
+  // Lugar seleccionado: agranda su ícono, lo acerca y lo deja libre de la hoja inferior.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
     if (map.getLayer('lugares-puntos'))
       map.setLayoutProperty('lugares-puntos', 'icon-size', tamanoIcono(seleccionadoId))
-    const l = lugares.find((x) => x.id === seleccionadoId)
-    if (l) map.easeTo({ center: [l.coordenadas[1], l.coordenadas[0]], duration: 400 })
-  }, [seleccionadoId, lugares])
+    if (seleccionado) {
+      map.easeTo({
+        center: [seleccionado.coordenadas[1], seleccionado.coordenadas[0]],
+        zoom: Math.max(map.getZoom(), 16.5),
+        padding: { bottom: Math.round(map.getContainer().clientHeight * 0.4) },
+        duration: 500,
+      })
+    } else {
+      map.easeTo({ padding: { bottom: 0 }, duration: 300 })
+    }
+  }, [seleccionado, seleccionadoId])
+
+  // Punto azul de "¿Dónde estoy?". Solo si cae cerca del campus (el mapa no sale de ahí).
+  const marcadorUsuario = useRef<Marker | null>(null)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ubicacion) return
+    if (!dentroDeLimites(ubicacion.lat, ubicacion.lng, campus.limites, HOLGURA)) return
+    if (!marcadorUsuario.current) {
+      const el = document.createElement('div')
+      el.className = 'punto-usuario'
+      el.setAttribute('role', 'img')
+      el.setAttribute('aria-label', 'Tu ubicación')
+      marcadorUsuario.current = new Marker({ element: el })
+    }
+    marcadorUsuario.current.setLngLat([ubicacion.lng, ubicacion.lat]).addTo(map)
+    map.easeTo({
+      center: [ubicacion.lng, ubicacion.lat],
+      zoom: Math.max(map.getZoom(), 17),
+      duration: 600,
+    })
+  }, [ubicacion, campus])
 
   return (
     // Envoltorio con tamaño definido: el CSS de MapLibre fuerza position:relative

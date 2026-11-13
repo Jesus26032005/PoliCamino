@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { NoticeBanner } from './components/NoticeBanner'
+import { Boton } from './components/Boton'
+import { Buscador } from './components/Buscador'
+import { ChipCategoria } from './components/ChipCategoria'
 import { HojaInferior } from './components/HojaInferior'
+import { NoticeBanner } from './components/NoticeBanner'
 import { CAMPUS, CAMPUS_INICIAL } from './data/campus'
 import { DetalleLugar } from './features/lugares/DetalleLugar'
 import { Mapa } from './features/mapa/Mapa'
+import { MENSAJE_UBICACION, useUbicacion } from './features/ubicacion/useUbicacion'
+import { crearIndice, filtrarPorCategorias } from './lib/busqueda'
 import { APP_NAME } from './lib/config'
+import { busquedaConLugar, leerLugarDeUrl } from './lib/enlaces'
+import { dentroDeLimites } from './lib/geo'
 import { cargarLugares } from './lib/lugares'
-import type { Lugar } from './lib/tipos'
+import { CATEGORIAS, type Categoria, type Lugar } from './lib/tipos'
 
 type Estado =
   | { fase: 'cargando' }
@@ -17,10 +24,38 @@ export default function App() {
   const campus = CAMPUS[CAMPUS_INICIAL]
   const [estado, setEstado] = useState<Estado>({ fase: 'cargando' })
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null)
+  const [activas, setActivas] = useState<ReadonlySet<Categoria>>(new Set())
+  const ubic = useUbicacion()
+
+  const lugares = useMemo(() => (estado.fase === 'listo' ? estado.lugares : []), [estado])
+  const indice = useMemo(() => crearIndice(lugares), [lugares])
+  const visibles = useMemo(
+    () => filtrarPorCategorias(lugares, activas),
+    [lugares, activas],
+  )
+  const seleccionado = lugares.find((l) => l.id === seleccionadoId) ?? null
+
+  const conteo = useMemo(() => {
+    const c = new Map<Categoria, number>()
+    for (const l of lugares) c.set(l.categoria, (c.get(l.categoria) ?? 0) + 1)
+    return c
+  }, [lugares])
+
+  // Elegir (o quitar) un lugar mantiene la URL compartible: /?lugar=id
+  const elegir = useCallback((id: string | null) => {
+    setSeleccionadoId(id)
+    const { pathname, search, hash } = window.location
+    window.history.replaceState(null, '', pathname + busquedaConLugar(search, id) + hash)
+  }, [])
 
   useEffect(() => {
     cargarLugares(campus.id)
-      .then((lugares) => setEstado({ fase: 'listo', lugares }))
+      .then((ls) => {
+        setEstado({ fase: 'listo', lugares: ls })
+        // Enlace compartido: abre el lugar si existe; si el id no existe, se ignora.
+        const id = leerLugarDeUrl(window.location.search)
+        if (id && ls.some((l) => l.id === id)) setSeleccionadoId(id)
+      })
       .catch((e: unknown) =>
         setEstado({
           fase: 'error',
@@ -29,9 +64,27 @@ export default function App() {
       )
   }, [campus.id])
 
-  const lugares = useMemo(() => (estado.fase === 'listo' ? estado.lugares : []), [estado])
-  const seleccionado = lugares.find((l) => l.id === seleccionadoId)
-  const cerrar = useCallback(() => setSeleccionadoId(null), [])
+  function alternarCategoria(c: Categoria) {
+    setActivas((previas) => {
+      const nuevas = new Set(previas)
+      if (!nuevas.delete(c)) nuevas.add(c)
+      return nuevas
+    })
+  }
+
+  function alElegirDeBuscador(l: Lugar) {
+    // Si el filtro ocultaba ese lugar, se quita para que se vea en el mapa.
+    if (activas.size > 0 && !activas.has(l.categoria)) setActivas(new Set())
+    elegir(l.id)
+  }
+
+  const fueraDelCampus =
+    ubic.estado === 'listo' &&
+    ubic.ubicacion !== null &&
+    !dentroDeLimites(ubic.ubicacion.lat, ubic.ubicacion.lng, campus.limites, 0.02)
+  const mensajeUbicacion = fueraDelCampus
+    ? 'Parece que estás lejos del campus, así que no te mostramos en el mapa.'
+    : MENSAJE_UBICACION[ubic.estado]
 
   return (
     <div className="flex h-full flex-col">
@@ -41,6 +94,60 @@ export default function App() {
       </header>
       <NoticeBanner compacto />
 
+      <div className="relative z-20 flex flex-col gap-2 border-b border-border bg-surface p-3">
+        <div className="flex gap-2">
+          <Buscador indice={indice} onElegir={alElegirDeBuscador} className="flex-1" />
+          <Boton
+            onClick={ubic.solicitar}
+            disabled={ubic.estado === 'buscando'}
+            aria-label="¿Dónde estoy?"
+            title="¿Dónde estoy?"
+            className="shrink-0"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              width="24"
+              height="24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+            </svg>
+          </Boton>
+        </div>
+
+        {mensajeUbicacion && (
+          <p role="status" className="text-small text-muted">
+            {mensajeUbicacion}
+          </p>
+        )}
+
+        <div
+          role="group"
+          aria-label="Filtrar por categoría"
+          className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1"
+        >
+          {CATEGORIAS.filter((c) => conteo.has(c)).map((c) => (
+            <ChipCategoria
+              key={c}
+              categoria={c}
+              cantidad={conteo.get(c)}
+              activo={activas.has(c)}
+              onClick={() => alternarCategoria(c)}
+            />
+          ))}
+          {activas.size > 0 && (
+            <Boton onClick={() => setActivas(new Set())} className="shrink-0 text-small">
+              Quitar filtros
+            </Boton>
+          )}
+        </div>
+      </div>
+
       <main className="relative flex-1">
         {estado.fase === 'error' ? (
           <p role="alert" className="p-4">
@@ -49,9 +156,10 @@ export default function App() {
         ) : (
           <Mapa
             campus={campus}
-            lugares={lugares}
-            seleccionadoId={seleccionadoId}
-            onSeleccionar={setSeleccionadoId}
+            lugares={visibles}
+            seleccionado={seleccionado}
+            onSeleccionar={elegir}
+            ubicacion={ubic.ubicacion}
           />
         )}
         {estado.fase === 'cargando' && (
@@ -62,8 +170,20 @@ export default function App() {
             Cargando lugares…
           </p>
         )}
+        {activas.size > 0 && (
+          <p
+            role="status"
+            className="absolute bottom-3 left-3 rounded-pill bg-surface px-3 py-1 text-small shadow-sheet"
+          >
+            Mostrando {visibles.length} de {lugares.length} lugares
+          </p>
+        )}
         {seleccionado && (
-          <HojaInferior titulo={seleccionado.nombre} onCerrar={cerrar}>
+          <HojaInferior
+            key={seleccionado.id}
+            titulo={seleccionado.nombre}
+            onCerrar={() => elegir(null)}
+          >
             <DetalleLugar lugar={seleccionado} />
           </HojaInferior>
         )}
