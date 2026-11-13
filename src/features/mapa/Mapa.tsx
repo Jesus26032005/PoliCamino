@@ -1,5 +1,6 @@
 import {
   AttributionControl,
+  LngLatBounds,
   Map as MapaGL,
   Marker,
   NavigationControl,
@@ -10,6 +11,7 @@ import { useEffect, useRef } from 'react'
 import limiteZacatenco from '../../data/zacatenco.limite.json'
 import { dentroDeLimites } from '../../lib/geo'
 import { lugaresAGeoJSON } from '../../lib/lugares'
+import { RUTA_VACIA, type RutaGeoJSON } from '../../lib/ruta'
 import { leerToken, useTemaOscuro } from '../../lib/tema'
 import type { Campus, Lugar } from '../../lib/tipos'
 import type { Ubicacion } from '../ubicacion/useUbicacion'
@@ -30,6 +32,7 @@ function cajaDelLimite(): [number, number, number, number] {
 const HOLGURA = 0.02
 
 const FUENTE = 'lugares'
+const RUTA = 'ruta'
 const LIMITE = 'campus-limite'
 
 type Props = {
@@ -39,12 +42,19 @@ type Props = {
   seleccionado: Lugar | null
   onSeleccionar: (id: string | null) => void
   ubicacion: Ubicacion | null
+  /** Ruta a dibujar (línea + origen y destino) o null. */
+  ruta: RutaGeoJSON | null
 }
 
 const tamanoIcono = (seleccionadoId: string | null) =>
   ['case', ['==', ['get', 'id'], seleccionadoId ?? ''], 1.3, 1] as never
 
-function instalarCapas(map: MapaGL, lugares: Lugar[], seleccionadoId: string | null) {
+function instalarCapas(
+  map: MapaGL,
+  lugares: Lugar[],
+  seleccionadoId: string | null,
+  ruta: RutaGeoJSON,
+) {
   registrarIconos(map)
   const primario = leerToken('--c-primary')
 
@@ -104,18 +114,66 @@ function instalarCapas(map: MapaGL, lugares: Lugar[], seleccionadoId: string | n
       'icon-allow-overlap': true,
     },
   })
+
+  // Ruta a pie: debajo de los íconos de lugares, por encima del mapa base.
+  const colorRuta = leerToken('--c-route')
+  map.addSource(RUTA, { type: 'geojson', data: ruta as never })
+  map.addLayer(
+    {
+      id: 'ruta-borde',
+      type: 'line',
+      source: RUTA,
+      filter: ['==', ['get', 'rol'], 'ruta'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#ffffff', 'line-width': 9 },
+    },
+    'clusters',
+  )
+  map.addLayer(
+    {
+      id: 'ruta-linea',
+      type: 'line',
+      source: RUTA,
+      filter: ['==', ['get', 'rol'], 'ruta'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': colorRuta, 'line-width': 5 },
+    },
+    'clusters',
+  )
+  map.addLayer(
+    {
+      id: 'ruta-puntos',
+      type: 'circle',
+      source: RUTA,
+      filter: ['!=', ['get', 'rol'], 'ruta'],
+      paint: {
+        'circle-radius': 8,
+        'circle-color': ['case', ['==', ['get', 'rol'], 'destino'], colorRuta, '#ffffff'],
+        'circle-stroke-color': colorRuta,
+        'circle-stroke-width': 4,
+      },
+    },
+    'clusters',
+  )
 }
 
-export function Mapa({ campus, lugares, seleccionado, onSeleccionar, ubicacion }: Props) {
+export function Mapa({
+  campus,
+  lugares,
+  seleccionado,
+  onSeleccionar,
+  ubicacion,
+  ruta,
+}: Props) {
   const seleccionadoId = seleccionado?.id ?? null
   const contenedor = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapaGL | null>(null)
   const oscuro = useTemaOscuro()
 
   // Los manejadores se registran una sola vez; leen siempre lo más reciente.
-  const ultimo = useRef({ lugares, seleccionadoId, onSeleccionar, oscuro })
+  const ultimo = useRef({ lugares, seleccionadoId, onSeleccionar, oscuro, ruta })
   useEffect(() => {
-    ultimo.current = { lugares, seleccionadoId, onSeleccionar, oscuro }
+    ultimo.current = { lugares, seleccionadoId, onSeleccionar, oscuro, ruta }
   })
 
   useEffect(() => {
@@ -143,7 +201,7 @@ export function Mapa({ campus, lugares, seleccionado, onSeleccionar, ubicacion }
     // Se dispara en la carga inicial y cada vez que cambia el estilo (tema).
     map.on('style.load', () => {
       const u = ultimo.current
-      instalarCapas(map, u.lugares, u.seleccionadoId)
+      instalarCapas(map, u.lugares, u.seleccionadoId, u.ruta ?? RUTA_VACIA)
     })
 
     map.on('click', 'lugares-puntos', (ev) => {
@@ -209,6 +267,30 @@ export function Mapa({ campus, lugares, seleccionado, onSeleccionar, ubicacion }
       map.easeTo({ padding: { bottom: 0 }, duration: 300 })
     }
   }, [seleccionado, seleccionadoId])
+
+  // Ruta: se actualiza la línea y se encuadra dejando libre la hoja inferior.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const fuente = map.getSource(RUTA) as GeoJSONSource | undefined
+    fuente?.setData((ruta ?? RUTA_VACIA) as never)
+    const linea = ruta?.features.find((f) => f.geometry.type === 'LineString')
+    if (!linea || linea.geometry.type !== 'LineString') return
+    const caja = linea.geometry.coordinates.reduce(
+      (b, c) => b.extend(c),
+      new LngLatBounds(linea.geometry.coordinates[0], linea.geometry.coordinates[0]),
+    )
+    map.fitBounds(caja, {
+      padding: {
+        top: 40,
+        left: 40,
+        right: 40,
+        bottom: Math.round(map.getContainer().clientHeight * 0.5),
+      },
+      maxZoom: 17,
+      duration: 700,
+    })
+  }, [ruta])
 
   // Punto azul de "¿Dónde estoy?". Solo si cae cerca del campus (el mapa no sale de ahí).
   const marcadorUsuario = useRef<Marker | null>(null)

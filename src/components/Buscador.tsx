@@ -7,14 +7,29 @@ type Props = {
   indice: IndiceBusqueda
   onElegir: (lugar: Lugar) => void
   className?: string
+  /** Etiqueta accesible (oculta a la vista). */
+  etiqueta?: string
+  placeholder?: string
+  /** Texto con el que arranca el campo; cambia `key` para reiniciarlo. */
+  valorInicial?: string
+  /** La lista de resultados ocupa espacio en la página en vez de flotar encima. */
+  enLinea?: boolean
 }
 
 /** Buscador con lista de resultados (patrón ARIA "combobox con listbox"). */
-export function Buscador({ indice, onElegir, className = '' }: Props) {
+export function Buscador({
+  indice,
+  onElegir,
+  className = '',
+  etiqueta = 'Buscar lugar en el campus',
+  placeholder = 'Buscar: ESCOM, biblioteca, cafetería…',
+  valorInicial = '',
+  enLinea = false,
+}: Props) {
   const id = useId()
   const listaId = `${id}-lista`
   const entrada = useRef<HTMLInputElement>(null)
-  const [consulta, setConsulta] = useState('')
+  const [consulta, setConsulta] = useState(valorInicial)
   const [abierto, setAbierto] = useState(false)
   const [activo, setActivo] = useState(0)
 
@@ -48,7 +63,7 @@ export function Buscador({ indice, onElegir, className = '' }: Props) {
   return (
     <div role="search" className={`relative ${className}`}>
       <label htmlFor={`${id}-entrada`} className="sr-only">
-        Buscar lugar en el campus
+        {etiqueta}
       </label>
       <input
         ref={entrada}
@@ -62,7 +77,7 @@ export function Buscador({ indice, onElegir, className = '' }: Props) {
           mostrar && resultados[activo] ? `${id}-op-${activo}` : undefined
         }
         autoComplete="off"
-        placeholder="Buscar: ESCOM, biblioteca, cafetería…"
+        placeholder={placeholder}
         value={consulta}
         onChange={(e) => {
           setConsulta(e.target.value)
@@ -75,7 +90,11 @@ export function Buscador({ indice, onElegir, className = '' }: Props) {
       />
 
       {mostrar && (
-        <div className="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-control border border-border bg-surface shadow-sheet">
+        <div
+          className={`mt-1 overflow-hidden rounded-control border border-border bg-surface ${
+            enLinea ? '' : 'absolute inset-x-0 top-full z-30 shadow-sheet'
+          }`}
+        >
           <ul id={listaId} role="listbox" aria-label="Resultados">
             {resultados.map((l, i) => (
               <li

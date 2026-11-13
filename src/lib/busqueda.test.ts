@@ -19,10 +19,13 @@ describe('buscar (con los datos reales)', () => {
       expect(buscar(indice, q)[0].nombre).toBe('Escuela Superior de Cómputo')
     }
   })
-  it('"biblio" devuelve bibliotecas', () => {
+  it('"biblio" devuelve las bibliotecas primero', () => {
     const r = buscar(indice, 'biblio')
-    expect(r.length).toBeGreaterThan(0)
-    expect(r.every((l) => l.categoria === 'biblioteca')).toBe(true)
+    const bibliotecas = lugares.filter((l) => l.categoria === 'biblioteca')
+    expect(bibliotecas.length).toBeGreaterThan(0)
+    expect(
+      r.slice(0, bibliotecas.length).every((l) => l.categoria === 'biblioteca'),
+    ).toBe(true)
   })
   it('"cafeteria" y "cafetería" dan lo mismo; las cafeterías van primero', () => {
     const a = buscar(indice, 'cafeteria', 50)

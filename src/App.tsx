@@ -7,12 +7,20 @@ import { NoticeBanner } from './components/NoticeBanner'
 import { CAMPUS, CAMPUS_INICIAL } from './data/campus'
 import { DetalleLugar } from './features/lugares/DetalleLugar'
 import { Mapa } from './features/mapa/Mapa'
+import {
+  PanelRuta,
+  type Origen,
+  type Pestana,
+  type PuntoRuta,
+} from './features/ruta/PanelRuta'
+import { useRuta } from './features/ruta/useRuta'
 import { MENSAJE_UBICACION, useUbicacion } from './features/ubicacion/useUbicacion'
 import { crearIndice, filtrarPorCategorias } from './lib/busqueda'
 import { APP_NAME } from './lib/config'
 import { busquedaConLugar, leerLugarDeUrl } from './lib/enlaces'
 import { dentroDeLimites } from './lib/geo'
 import { cargarLugares } from './lib/lugares'
+import { formatearDistancia, formatearDuracion, rutaAGeoJSON } from './lib/ruta'
 import { CATEGORIAS, type Categoria, type Lugar } from './lib/tipos'
 
 type Estado =
@@ -26,6 +34,30 @@ export default function App() {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null)
   const [activas, setActivas] = useState<ReadonlySet<Categoria>>(new Set())
   const ubic = useUbicacion()
+
+  // Cómo llegar: panel, origen, destino y ruta a pie.
+  const [panelAbierto, setPanelAbierto] = useState(false)
+  const [pestana, setPestana] = useState<Pestana>('llegar')
+  const [origen, setOrigen] = useState<Origen>(null)
+  const [destino, setDestino] = useState<PuntoRuta | null>(null)
+  const origenCoords =
+    origen === 'ubicacion'
+      ? ubic.ubicacion
+        ? ([ubic.ubicacion.lat, ubic.ubicacion.lng] as const)
+        : null
+      : (origen?.coordenadas ?? null)
+  const estadoRuta = useRuta(
+    origenCoords ? [...origenCoords] : null,
+    destino?.coordenadas ?? null,
+  )
+  const rutaCalculada = estadoRuta.fase === 'listo' ? estadoRuta.ruta : null
+  const [oLat, oLng] = origenCoords ?? [NaN, NaN]
+  const [dLat, dLng] = destino?.coordenadas ?? [NaN, NaN]
+  const rutaGeo = useMemo(
+    () =>
+      rutaCalculada ? rutaAGeoJSON(rutaCalculada, [oLat, oLng], [dLat, dLng]) : null,
+    [rutaCalculada, oLat, oLng, dLat, dLng],
+  )
 
   const lugares = useMemo(() => (estado.fase === 'listo' ? estado.lugares : []), [estado])
   const indice = useMemo(() => crearIndice(lugares), [lugares])
@@ -75,7 +107,30 @@ export default function App() {
   function alElegirDeBuscador(l: Lugar) {
     // Si el filtro ocultaba ese lugar, se quita para que se vea en el mapa.
     if (activas.size > 0 && !activas.has(l.categoria)) setActivas(new Set())
+    setPanelAbierto(false)
     elegir(l.id)
+  }
+
+  function alSeleccionarEnMapa(id: string | null) {
+    if (id) setPanelAbierto(false)
+    elegir(id)
+  }
+
+  function comoLlegarA(l: Lugar) {
+    setDestino({ nombre: l.nombre, coordenadas: l.coordenadas })
+    setPestana('ruta')
+    setPanelAbierto(true)
+    elegir(null)
+  }
+
+  function usarMiUbicacion() {
+    setOrigen('ubicacion')
+    ubic.solicitar()
+  }
+
+  function quitarRuta() {
+    setOrigen(null)
+    setDestino(null)
   }
 
   const fueraDelCampus =
@@ -89,8 +144,20 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2">
-        <h1 className="text-body font-bold text-primary">{APP_NAME}</h1>
-        <span className="text-small text-muted">{campus.nombre}</span>
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-body font-bold text-primary">{APP_NAME}</h1>
+          <span className="text-small text-muted">{campus.nombre}</span>
+        </div>
+        <Boton
+          onClick={() => {
+            setPestana(destino || origen ? 'ruta' : 'llegar')
+            setPanelAbierto(true)
+          }}
+          aria-expanded={panelAbierto}
+          className="min-h-touch"
+        >
+          Cómo llegar
+        </Boton>
       </header>
       <NoticeBanner compacto />
 
@@ -158,8 +225,9 @@ export default function App() {
             campus={campus}
             lugares={visibles}
             seleccionado={seleccionado}
-            onSeleccionar={elegir}
+            onSeleccionar={alSeleccionarEnMapa}
             ubicacion={ubic.ubicacion}
+            ruta={rutaGeo}
           />
         )}
         {estado.fase === 'cargando' && (
@@ -178,14 +246,49 @@ export default function App() {
             Mostrando {visibles.length} de {lugares.length} lugares
           </p>
         )}
-        {seleccionado && (
-          <HojaInferior
-            key={seleccionado.id}
-            titulo={seleccionado.nombre}
-            onCerrar={() => elegir(null)}
-          >
-            <DetalleLugar lugar={seleccionado} />
+        {rutaCalculada && !panelAbierto && !seleccionado && (
+          <div className="absolute bottom-3 right-3 flex items-center gap-2 rounded-control border border-border bg-surface p-2 shadow-sheet">
+            <span role="status" className="px-2 text-small">
+              Ruta: {formatearDistancia(rutaCalculada.distanciaM)} ·{' '}
+              {formatearDuracion(rutaCalculada.duracionS)}
+            </span>
+            <Boton onClick={quitarRuta} className="text-small">
+              Quitar ruta
+            </Boton>
+          </div>
+        )}
+        {panelAbierto ? (
+          <HojaInferior titulo="Cómo llegar" onCerrar={() => setPanelAbierto(false)}>
+            <PanelRuta
+              lugares={lugares}
+              pestana={pestana}
+              onPestana={setPestana}
+              origen={origen}
+              destino={destino}
+              onOrigen={setOrigen}
+              onDestino={setDestino}
+              estado={estadoRuta}
+              mensajeUbicacion={mensajeUbicacion}
+              onUsarUbicacion={usarMiUbicacion}
+              onVerLugar={(id) => {
+                setPanelAbierto(false)
+                elegir(id)
+              }}
+            />
           </HojaInferior>
+        ) : (
+          seleccionado && (
+            <HojaInferior
+              key={seleccionado.id}
+              titulo={seleccionado.nombre}
+              onCerrar={() => elegir(null)}
+            >
+              <DetalleLugar
+                lugar={seleccionado}
+                onComoLlegar={() => comoLlegarA(seleccionado)}
+              />
+            </HojaInferior>
+          )
         )}
       </main>
     </div>

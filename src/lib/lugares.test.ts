@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CAMPUS } from '../data/campus'
 import datos from '../data/zacatenco.lugares.json'
+import { dentroDeLimites } from './geo'
 import { cargarLugares, lugaresAGeoJSON, validarLugar, validarLugares } from './lugares'
 import type { Lugar } from './tipos'
 
@@ -46,13 +47,26 @@ describe('datos de Zacatenco', () => {
     const lugares = await cargarLugares('zacatenco')
     expect(lugares.length).toBeGreaterThan(30)
   })
-  it('están dentro de los límites del campus', () => {
-    const [[s, o], [n, e]] = CAMPUS.zacatenco.limites
+  it('están dentro de los límites del campus (con holgura para el transporte cercano)', () => {
     for (const l of datos) {
-      expect(l.coordenadas[0]).toBeGreaterThan(s)
-      expect(l.coordenadas[0]).toBeLessThan(n)
-      expect(l.coordenadas[1]).toBeGreaterThan(o)
-      expect(l.coordenadas[1]).toBeLessThan(e)
+      expect(
+        dentroDeLimites(
+          l.coordenadas[0],
+          l.coordenadas[1],
+          CAMPUS.zacatenco.limites,
+          0.01,
+        ),
+      ).toBe(true)
+    }
+  })
+  it('hay accesos, Metro y paradas, todos con fuente y sin verificar', () => {
+    const cats = (c: string) => datos.filter((l) => l.categoria === c)
+    expect(cats('acceso').length).toBeGreaterThan(0)
+    expect(cats('transporte').some((l) => l.nombre.startsWith('Metro '))).toBe(true)
+    expect(cats('transporte').some((l) => l.nombre.startsWith('Parada '))).toBe(true)
+    for (const l of [...cats('acceso'), ...cats('transporte')]) {
+      expect(l.fuente).toMatch(/OpenStreetMap/)
+      expect(l.verificado).toBe(false)
     }
   })
   it('incluye ESCOM', () => {

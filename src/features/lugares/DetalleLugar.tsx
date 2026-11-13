@@ -1,3 +1,4 @@
+import { Boton } from '../../components/Boton'
 import { ChipCategoria } from '../../components/ChipCategoria'
 import { CompartirLugar } from './CompartirLugar'
 import type { Lugar } from '../../lib/tipos'
@@ -13,7 +14,13 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor?: string }) {
 }
 
 /** Contenido de la hoja: solo muestra datos que existen, y dice si están sin verificar. */
-export function DetalleLugar({ lugar }: { lugar: Lugar }) {
+export function DetalleLugar({
+  lugar,
+  onComoLlegar,
+}: {
+  lugar: Lugar
+  onComoLlegar: () => void
+}) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -44,7 +51,12 @@ export function DetalleLugar({ lugar }: { lugar: Lugar }) {
         </p>
       )}
       {lugar.fuente && <p className="text-small text-muted">Fuente: {lugar.fuente}</p>}
-      <CompartirLugar lugar={lugar} />
+      <div className="flex flex-wrap items-start gap-2">
+        <Boton variante="primario" onClick={onComoLlegar}>
+          Cómo llegar aquí
+        </Boton>
+        <CompartirLugar lugar={lugar} />
+      </div>
     </>
   )
 }
