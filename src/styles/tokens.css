@@ -1,0 +1,83 @@
+/*
+ * TOKENS DE DISEÑO — única fuente de verdad de colores, espaciado,
+ * radios y tipografía. Los componentes solo usan clases semánticas
+ * (bg-surface, text-muted, rounded-card...), nunca valores sueltos.
+ *
+ * Tema: sigue al sistema; se puede forzar con <html data-theme="light|dark">.
+ * Contraste verificado WCAG AA (texto normal >= 4.5:1).
+ */
+
+/* 1) Valores por tema */
+:root {
+  color-scheme: light;
+  --c-bg: #faf8f5;
+  --c-surface: #ffffff;
+  --c-text: #1c1917;
+  --c-muted: #57534e;
+  --c-border: #d6d3d1;
+  --c-primary: #8a1c3c;
+  --c-on-primary: #ffffff;
+  --c-notice-bg: #fff4d6;
+  --c-notice-text: #5c3d00;
+  --c-focus: #1d4ed8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --c-bg: #12100e;
+    --c-surface: #1c1917;
+    --c-text: #f5f5f4;
+    --c-muted: #a8a29e;
+    --c-border: #44403c;
+    --c-primary: #f0a3ba;
+    --c-on-primary: #12100e;
+    --c-notice-bg: #3a2c0a;
+    --c-notice-text: #ffe9ad;
+    --c-focus: #93b4ff;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --c-bg: #12100e;
+  --c-surface: #1c1917;
+  --c-text: #f5f5f4;
+  --c-muted: #a8a29e;
+  --c-border: #44403c;
+  --c-primary: #f0a3ba;
+  --c-on-primary: #12100e;
+  --c-notice-bg: #3a2c0a;
+  --c-notice-text: #ffe9ad;
+  --c-focus: #93b4ff;
+}
+
+/* 2) Tokens que Tailwind expone como utilidades */
+@theme inline {
+  --color-bg: var(--c-bg);
+  --color-surface: var(--c-surface);
+  --color-text: var(--c-text);
+  --color-muted: var(--c-muted);
+  --color-border: var(--c-border);
+  --color-primary: var(--c-primary);
+  --color-on-primary: var(--c-on-primary);
+  --color-notice-bg: var(--c-notice-bg);
+  --color-notice-text: var(--c-notice-text);
+  --color-focus: var(--c-focus);
+}
+
+/* 3) Tokens independientes del tema */
+@theme {
+  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --text-body: 1rem;
+  --text-small: 0.875rem;
+  --text-title: 1.5rem;
+
+  --radius-card: 1rem;
+  --radius-control: 0.75rem;
+  --radius-pill: 999px;
+
+  /* Objetivo táctil mínimo recomendado (44-48 px) */
+  --spacing-touch: 3rem;
+}
