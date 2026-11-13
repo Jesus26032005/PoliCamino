@@ -15,3 +15,8 @@
     outline-offset: 2px;
   }
 }
+
+/* La atribución de OSM (arriba a la izquierda) no debe pasar bajo los botones de zoom. */
+.maplibregl-ctrl-top-left {
+  max-width: calc(100% - 3.5rem);
+}

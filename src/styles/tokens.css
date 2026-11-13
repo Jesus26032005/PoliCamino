@@ -20,6 +20,19 @@
   --c-notice-bg: #fff4d6;
   --c-notice-text: #5c3d00;
   --c-focus: #1d4ed8;
+
+  /* Colores de categoría (iguales en ambos temas; ícono blanco encima). */
+  --c-cat-escuela: #2563eb;
+  --c-cat-biblioteca: #7c3aed;
+  --c-cat-laboratorio: #0f766e;
+  --c-cat-cafeteria: #b45309;
+  --c-cat-servicio: #475569;
+  --c-cat-deporte: #15803d;
+  --c-cat-cultura: #be185d;
+  --c-cat-acceso: #b91c1c;
+  --c-cat-transporte: #0369a1;
+  --c-cat-baños: #4338ca;
+  --c-cat-otro: #57534e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -80,4 +93,9 @@
 
   /* Objetivo táctil mínimo recomendado (44-48 px) */
   --spacing-touch: 3rem;
+}
+
+/* Tamaños de la hoja inferior */
+@theme {
+  --shadow-sheet: 0 -4px 24px rgb(0 0 0 / 0.18);
 }

@@ -22,4 +22,10 @@ npm run build      # build de producción
 - `src/features/`: funciones por dominio (mapa, búsqueda...).
 - `src/data/`: datos en JSON (lugares por campus).
 
-Estado: Fase 0 (base del proyecto).
+Estado: Fase 1 (mapa de Zacatenco con lugares de OpenStreetMap, sin verificar).
+
+## Datos
+
+`npm run importar:osm` consulta Overpass y regenera `src/data/zacatenco.lugares.json`.
+Todo lo importado entra con `verificado: false`. Datos © colaboradores de OpenStreetMap (ODbL). Teselas de OpenFreeMap.
+
