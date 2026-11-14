@@ -5,6 +5,7 @@
     "lib": ["ES2024"],
     "types": ["node"],
     "skipLibCheck": true,
+    "resolveJsonModule": true,
 
     /* Bundler mode */
     "module": "nodenext",
@@ -19,5 +20,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "scripts", "api"]
+  "include": ["vite.config.ts", "scripts", "api", "worker/src"]
 }

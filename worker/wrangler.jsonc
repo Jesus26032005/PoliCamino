@@ -1,0 +1,22 @@
+{
+  // Worker de ocupación (Fase 5-A). Se despliega aparte del sitio estático.
+  "name": "rutapoli-ocupacion",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "rutapoli-ocupacion",
+      // Reemplaza con el id real que imprime `wrangler d1 create rutapoli-ocupacion`.
+      // Para pruebas locales (--local) basta este valor de relleno.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+    },
+  ],
+  "vars": {
+    // Orígenes que pueden llamar a la API (separados por coma). Agrega el dominio de producción.
+    "ORIGENES_PERMITIDOS": "http://localhost:5173,http://localhost:4173",
+  },
+  // Cada día borra reportes de más de 24 h.
+  "triggers": { "crons": ["17 3 * * *"] },
+  // Secreto (no va en el repositorio):  npx wrangler secret put SAL_SECRETA
+}

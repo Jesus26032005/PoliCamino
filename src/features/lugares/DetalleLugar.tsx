@@ -3,6 +3,9 @@ import { ChipCategoria } from '../../components/ChipCategoria'
 import { URL_REPOSITORIO } from '../../lib/config'
 import { enlaceSugerencia } from '../../lib/servicios'
 import { CompartirLugar } from './CompartirLugar'
+import { API_OCUPACION } from '../ocupacion/api'
+import { OcupacionLugar } from '../ocupacion/OcupacionLugar'
+import { admiteOcupacion } from '../../lib/ocupacion'
 import { ServiciosLugar } from './ServiciosLugar'
 import type { Lugar } from '../../lib/tipos'
 
@@ -49,6 +52,10 @@ export function DetalleLugar({
       </dl>
 
       <ServiciosLugar lugar={lugar} />
+
+      {API_OCUPACION && admiteOcupacion(lugar.categoria) && (
+        <OcupacionLugar lugarId={lugar.id} />
+      )}
 
       {!lugar.verificado && (
         <p className="text-small text-muted">
