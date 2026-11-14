@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Boton } from './components/Boton'
 import { Buscador } from './components/Buscador'
 import { ChipCategoria } from './components/ChipCategoria'
+import { ChipFiltro } from './components/ChipFiltro'
 import { HojaInferior } from './components/HojaInferior'
 import { NoticeBanner } from './components/NoticeBanner'
 import { CAMPUS, CAMPUS_INICIAL } from './data/campus'
@@ -22,6 +23,12 @@ import { APP_NAME } from './lib/config'
 import { busquedaConLugar, leerLugarDeUrl } from './lib/enlaces'
 import { dentroDeLimites } from './lib/geo'
 import { cargarLugares } from './lib/lugares'
+import {
+  esSilencioso,
+  filtrarPorServicios,
+  tieneEnchufes,
+  type FiltroServicios,
+} from './lib/servicios'
 import { formatearDistancia, formatearDuracion, rutaAGeoJSON } from './lib/ruta'
 import { descripcionClima } from './lib/envivo'
 import { CATEGORIAS, type Categoria, type Lugar } from './lib/tipos'
@@ -36,6 +43,10 @@ export default function App() {
   const [estado, setEstado] = useState<Estado>({ fase: 'cargando' })
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null)
   const [activas, setActivas] = useState<ReadonlySet<Categoria>>(new Set())
+  const [filtroServ, setFiltroServ] = useState<FiltroServicios>({
+    enchufes: false,
+    silencio: false,
+  })
   const ubic = useUbicacion()
   const enVivo = useEnVivo(campus.centro)
   const [hoyAbierto, setHoyAbierto] = useState(false)
@@ -67,9 +78,16 @@ export default function App() {
   const lugares = useMemo(() => (estado.fase === 'listo' ? estado.lugares : []), [estado])
   const indice = useMemo(() => crearIndice(lugares), [lugares])
   const visibles = useMemo(
-    () => filtrarPorCategorias(lugares, activas),
-    [lugares, activas],
+    () => filtrarPorServicios(filtrarPorCategorias(lugares, activas), filtroServ),
+    [lugares, activas, filtroServ],
   )
+  const hayFiltros = activas.size > 0 || filtroServ.enchufes || filtroServ.silencio
+  const quitarFiltros = () => {
+    setActivas(new Set())
+    setFiltroServ({ enchufes: false, silencio: false })
+  }
+  const nEnchufes = useMemo(() => lugares.filter(tieneEnchufes).length, [lugares])
+  const nSilencio = useMemo(() => lugares.filter(esSilencioso).length, [lugares])
   const seleccionado = lugares.find((l) => l.id === seleccionadoId) ?? null
 
   const conteo = useMemo(() => {
@@ -111,7 +129,7 @@ export default function App() {
 
   function alElegirDeBuscador(l: Lugar) {
     // Si el filtro ocultaba ese lugar, se quita para que se vea en el mapa.
-    if (activas.size > 0 && !activas.has(l.categoria)) setActivas(new Set())
+    if (hayFiltros && !visibles.some((v) => v.id === l.id)) quitarFiltros()
     setPanelAbierto(false)
     setHoyAbierto(false)
     elegir(l.id)
@@ -234,8 +252,24 @@ export default function App() {
               onClick={() => alternarCategoria(c)}
             />
           ))}
-          {activas.size > 0 && (
-            <Boton onClick={() => setActivas(new Set())} className="shrink-0 text-small">
+          {nEnchufes > 0 && (
+            <ChipFiltro
+              etiqueta="Con enchufes"
+              cantidad={nEnchufes}
+              activo={filtroServ.enchufes}
+              onClick={() => setFiltroServ((f) => ({ ...f, enchufes: !f.enchufes }))}
+            />
+          )}
+          {nSilencio > 0 && (
+            <ChipFiltro
+              etiqueta="Silencioso"
+              cantidad={nSilencio}
+              activo={filtroServ.silencio}
+              onClick={() => setFiltroServ((f) => ({ ...f, silencio: !f.silencio }))}
+            />
+          )}
+          {hayFiltros && (
+            <Boton onClick={quitarFiltros} className="shrink-0 text-small">
               Quitar filtros
             </Boton>
           )}
@@ -265,7 +299,7 @@ export default function App() {
             Cargando lugares…
           </p>
         )}
-        {activas.size > 0 && (
+        {hayFiltros && (
           <p
             role="status"
             className="absolute bottom-3 left-3 rounded-pill bg-surface px-3 py-1 text-small shadow-sheet"

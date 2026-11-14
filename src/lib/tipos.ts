@@ -28,6 +28,26 @@ export type Campus = {
   limites: [LatLng, LatLng]
 }
 
+export const VALORES_ENCHUFES = ['muchos', 'pocos', 'no'] as const
+export const VALORES_SILENCIO = ['silencioso', 'moderado', 'ruidoso'] as const
+export type ValorEnchufes = (typeof VALORES_ENCHUFES)[number]
+export type ValorSilencio = (typeof VALORES_SILENCIO)[number]
+
+/** Un dato aportado por la comunidad: siempre con fuente, fecha y marca de verificación. */
+export type Atributo<V> = {
+  valor: V
+  /** Cómo se obtuvo, ej. "Visita de Ana a la biblioteca" o "Reporte de la escuela". */
+  fuente: string
+  /** Fecha ISO (AAAA-MM-DD) en que se comprobó. */
+  fecha: string
+  verificado: boolean
+}
+
+export type Servicios = {
+  enchufes?: Atributo<ValorEnchufes>
+  silencio?: Atributo<ValorSilencio>
+}
+
 export type Lugar = {
   id: string
   campusId: CampusId
@@ -47,4 +67,6 @@ export type Lugar = {
   osmId?: string
   /** Fecha ISO (YYYY-MM-DD) de la última consulta a la fuente. */
   actualizado?: string
+  /** Enchufes y silencio; viene de `<campus>.servicios.json`, no de OSM. */
+  servicios?: Servicios
 }

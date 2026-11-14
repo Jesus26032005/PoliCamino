@@ -1,6 +1,9 @@
 import { Boton } from '../../components/Boton'
 import { ChipCategoria } from '../../components/ChipCategoria'
+import { URL_REPOSITORIO } from '../../lib/config'
+import { enlaceSugerencia } from '../../lib/servicios'
 import { CompartirLugar } from './CompartirLugar'
+import { ServiciosLugar } from './ServiciosLugar'
 import type { Lugar } from '../../lib/tipos'
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor?: string }) {
@@ -21,6 +24,7 @@ export function DetalleLugar({
   lugar: Lugar
   onComoLlegar: () => void
 }) {
+  const sugerencia = enlaceSugerencia(lugar, URL_REPOSITORIO)
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -44,6 +48,8 @@ export function DetalleLugar({
         <Dato etiqueta="Horario" valor={lugar.horario} />
       </dl>
 
+      <ServiciosLugar lugar={lugar} />
+
       {!lugar.verificado && (
         <p className="text-small text-muted">
           Ubicación tomada de OpenStreetMap; aún nadie la confirma en campo. Si algo está
@@ -57,6 +63,19 @@ export function DetalleLugar({
         </Boton>
         <CompartirLugar lugar={lugar} />
       </div>
+      {sugerencia && (
+        <p className="text-small">
+          ¿Sabes si hay enchufes o si es silencioso?{' '}
+          <a
+            href={sugerencia}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline"
+          >
+            Sugerir datos
+          </a>
+        </p>
+      )}
     </>
   )
 }

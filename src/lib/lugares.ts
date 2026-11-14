@@ -1,3 +1,4 @@
+import { aplicarServicios } from './servicios'
 import { CATEGORIAS, type CampusId, type Lugar } from './tipos'
 
 /** Devuelve la lista de problemas de un lugar (vacía si es válido). */
@@ -53,10 +54,20 @@ const CARGADORES: Partial<Record<CampusId, () => Promise<{ default: unknown }>>>
   zacatenco: () => import('../data/zacatenco.lugares.json'),
 }
 
+const CARGADORES_SERVICIOS: Partial<
+  Record<CampusId, () => Promise<{ default: unknown }>>
+> = {
+  zacatenco: () => import('../data/zacatenco.servicios.json'),
+}
+
 export async function cargarLugares(campusId: CampusId): Promise<Lugar[]> {
   const cargar = CARGADORES[campusId]
   if (!cargar) throw new Error(`Aún no hay datos para el campus "${campusId}"`)
-  return validarLugares((await cargar()).default)
+  const [lugares, servicios] = await Promise.all([
+    cargar(),
+    CARGADORES_SERVICIOS[campusId]?.() ?? Promise.resolve({ default: {} }),
+  ])
+  return aplicarServicios(validarLugares(lugares.default), servicios.default)
 }
 
 export type LugaresGeoJSON = {

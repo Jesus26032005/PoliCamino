@@ -47,3 +47,35 @@ Todo lo importado entra con `verificado: false`. Datos © colaboradores de OpenS
 `/api/sismos` es un proxy mínimo: en desarrollo lo hace Vite (`vite.config.ts`); en producción,
 la función `api/sismos.ts` (formato Vercel Functions, **aún no probada desplegada**). Sin ella, la tarjeta
 muestra el error de sismos y el resto sigue funcionando.
+
+## Enchufes y zonas silenciosas (Fase 5-C)
+
+Los datos viven en `src/data/zacatenco.servicios.json` (separado de `zacatenco.lugares.json`, que se
+regenera desde OSM). Está vacío hasta que alguien aporte datos reales: **no se inventan**.
+
+```json
+{
+  "osm-w293805766": {
+    "enchufes": {
+      "valor": "pocos",
+      "fuente": "Visita de Ana, biblioteca ESFM",
+      "fecha": "2026-11-13",
+      "verificado": false
+    },
+    "silencio": {
+      "valor": "silencioso",
+      "fuente": "Visita de Ana, biblioteca ESFM",
+      "fecha": "2026-11-13",
+      "verificado": false
+    }
+  }
+}
+```
+
+- `enchufes`: `muchos` | `pocos` | `no`. `silencio`: `silencioso` | `moderado` | `ruidoso`.
+- Cada dato lleva `fuente` (cómo lo comprobaste), `fecha` (AAAA-MM-DD) y `verificado`.
+- El id del lugar sale de `zacatenco.lugares.json` (o de la URL `/?lugar=id`). La app valida el archivo al cargar y
+  rechaza ids inexistentes, valores raros o aportes sin fuente.
+- Los chips «Con enchufes» y «Silencioso» aparecen solos cuando hay al menos un lugar con ese dato.
+- El botón «Sugerir datos» abre un issue prellenado; se activa al poner la dirección del repositorio en
+  `URL_REPOSITORIO` (`src/lib/config.ts`).
