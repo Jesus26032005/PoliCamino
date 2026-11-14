@@ -22,7 +22,7 @@ npm run build      # build de producción
 - `src/features/`: funciones por dominio (mapa, búsqueda...).
 - `src/data/`: datos en JSON (lugares por campus).
 
-Estado: Fase 5 (enchufes/silencio y ocupación reportada).
+Estado: Fase 6 (multicampus: Zacatenco y Santo Tomás).
 
 ## Datos
 
@@ -120,3 +120,36 @@ Si cambian los lugares: `npm run importar:osm` y luego `npm run generar:ocupacio
 
 **Costos** (planes gratuitos de Cloudflare, verificados el 13-nov-2026): Workers 100,000 peticiones/día;
 D1 5 millones de filas leídas y 100,000 escritas por día, 5 GB. La lectura se cachea 20 s en memoria y 30 s en el navegador.
+
+## Multicampus (Fase 6)
+
+Campus disponibles: **Zacatenco** y **Santo Tomás**. El selector de campus cambia centro, polígono, lugares,
+filtros y clima sin recargar. Cada campus es su propio conjunto de archivos (`src/data/<id>.*.json`) y se
+descarga solo cuando se elige (carga perezosa: cada uno es un chunk aparte en el build). Los enlaces compartidos
+llevan el campus (`/?campus=santo-tomas&lugar=id`); si un enlace trae solo `lugar`, la app busca el lugar en los campus.
+
+> Santo Tomás es un multipolígono de 4 parcelas del Casco (OSM `relation/12512609`). Quedan fuera sitios del IPN
+> que están separados del Casco, como el CECyT 9. No hay paradas de camión mapeadas cerca en OSM (hoy hay 0);
+> los accesos son puertas de OSM sin nombre. Todo está sin verificar.
+
+### Cómo agregar un campus (ej. «Zacatenco II»)
+
+1. **Id.** Elige un id en minúsculas con guiones (`mi-campus`) y agrégalo al tipo `CampusId` en `src/lib/tipos.ts`.
+2. **Polígono en OSM.** En openstreetmap.org busca el campus (la vía `way` o relación `relation` que lo delimita) y
+   anota su tipo e id. Agrégalo en `scripts/campus-osm.ts`:
+   `'mi-campus': { tipo: 'relation', id: 123456 }`. Si no existe en OSM, edítalo en OSM primero (así lo aprovecha todo el mundo).
+3. **Importa los datos:** `npm run importar:osm -- mi-campus`. Genera `src/data/mi-campus.lugares.json`,
+   `.limite.json` y `.servicios.json` (vacío). Overpass a veces responde 502; el script reintenta solo. Al final imprime la
+   caja del polígono. Revisa los lugares importados: todo entra `verificado: false`.
+4. **Metadatos.** En `src/data/campus.ts` agrega el campus a `CAMPUS` (nombre, `centro`, `zoom`, y `limites` = caja
+   del polígono + ~0.004° de margen, `[[sur, oeste], [norte, este]]`) y a `CAMPUS_LISTA`.
+5. **Carga perezosa.** En `src/lib/lugares.ts` agrega el campus a los tres mapas `CARGADORES`, `CARGADORES_SERVICIOS`
+   y `CARGADORES_LIMITE` (un `import()` por archivo).
+6. **Siglas.** Si el campus tiene escuelas con siglas de uso común, agrégalas en `scripts/clasificar.ts` (`ALIAS`) y
+   reimporta. Solo siglas que estés seguro de que son oficiales.
+7. **Ocupación (opcional).** `npm run generar:ocupacion` actualiza la lista de ids del Worker y vuelve a desplegarlo
+   (`wrangler deploy`); una prueba avisa si quedan desincronizados.
+8. **Comprueba:** `npm test` valida los datos de **todos** los campus de `CAMPUS_LISTA` (límites, fuentes, sin
+   verificados) y `npm run dev` te deja verlo en el selector. Haz commit de los JSON generados.
+
+Reimportar un campus sobrescribe `lugares.json` y `limite.json`, **nunca** `servicios.json`.

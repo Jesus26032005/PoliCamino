@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Boton } from './components/Boton'
 import { Buscador } from './components/Buscador'
 import { ChipCategoria } from './components/ChipCategoria'
 import { ChipFiltro } from './components/ChipFiltro'
 import { HojaInferior } from './components/HojaInferior'
 import { NoticeBanner } from './components/NoticeBanner'
-import { CAMPUS, CAMPUS_INICIAL } from './data/campus'
+import { CAMPUS, CAMPUS_INICIAL, CAMPUS_LISTA, esCampusId } from './data/campus'
+import { SelectorCampus } from './components/SelectorCampus'
 import { DetalleLugar } from './features/lugares/DetalleLugar'
 import { TarjetaHoy } from './features/envivo/TarjetaHoy'
 import { useEnVivo } from './features/envivo/useEnVivo'
@@ -20,9 +21,9 @@ import { useRuta } from './features/ruta/useRuta'
 import { MENSAJE_UBICACION, useUbicacion } from './features/ubicacion/useUbicacion'
 import { crearIndice, filtrarPorCategorias } from './lib/busqueda'
 import { APP_NAME } from './lib/config'
-import { busquedaConLugar, leerLugarDeUrl } from './lib/enlaces'
+import { busquedaCon, leerCampusDeUrl, leerLugarDeUrl } from './lib/enlaces'
 import { dentroDeLimites } from './lib/geo'
-import { cargarLugares } from './lib/lugares'
+import { cargarLimite, cargarLugares, type LimiteGeoJSON } from './lib/lugares'
 import {
   esSilencioso,
   filtrarPorServicios,
@@ -31,16 +32,38 @@ import {
 } from './lib/servicios'
 import { formatearDistancia, formatearDuracion, rutaAGeoJSON } from './lib/ruta'
 import { descripcionClima } from './lib/envivo'
-import { CATEGORIAS, type Categoria, type Lugar } from './lib/tipos'
+import { CATEGORIAS, type CampusId, type Categoria, type Lugar } from './lib/tipos'
 
-type Estado =
-  | { fase: 'cargando' }
-  | { fase: 'error'; mensaje: string }
-  | { fase: 'listo'; lugares: Lugar[] }
+type Carga =
+  | { campusId: CampusId; fase: 'listo'; lugares: Lugar[]; limite: LimiteGeoJSON }
+  | { campusId: CampusId; fase: 'error'; mensaje: string }
+
+const SIN_LUGARES: Lugar[] = []
+
+/** Reescribe campus y lugar en la URL (el campus por defecto no se escribe). */
+function escribirUrl(campusId: CampusId, lugarId: string | null) {
+  const { pathname, search, hash } = window.location
+  const nueva = busquedaCon(search, {
+    campus: campusId === CAMPUS_INICIAL ? null : campusId,
+    lugar: lugarId,
+  })
+  window.history.replaceState(null, '', pathname + nueva + hash)
+}
 
 export default function App() {
-  const campus = CAMPUS[CAMPUS_INICIAL]
-  const [estado, setEstado] = useState<Estado>({ fase: 'cargando' })
+  // Campus y lugar que pide la URL al abrir (enlaces compartidos).
+  const [campusId, setCampusId] = useState<CampusId>(() => {
+    const c = leerCampusDeUrl(window.location.search)
+    return esCampusId(c) ? c : CAMPUS_INICIAL
+  })
+  const campusEnUrl = useRef(esCampusId(leerCampusDeUrl(window.location.search)))
+  const lugarPendiente = useRef<string | null>(leerLugarDeUrl(window.location.search))
+  const campus = CAMPUS[campusId]
+  const [carga, setCarga] = useState<Carga | null>(null)
+  // Si lo cargado es de otro campus, se considera "cargando" (sin parpadeos de datos ajenos).
+  const actual = carga?.campusId === campusId ? carga : null
+  const lugares = actual?.fase === 'listo' ? actual.lugares : SIN_LUGARES
+  const limite = actual?.fase === 'listo' ? actual.limite : null
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null)
   const [activas, setActivas] = useState<ReadonlySet<Categoria>>(new Set())
   const [filtroServ, setFiltroServ] = useState<FiltroServicios>({
@@ -75,7 +98,6 @@ export default function App() {
     [rutaCalculada, oLat, oLng, dLat, dLng],
   )
 
-  const lugares = useMemo(() => (estado.fase === 'listo' ? estado.lugares : []), [estado])
   const indice = useMemo(() => crearIndice(lugares), [lugares])
   const visibles = useMemo(
     () => filtrarPorServicios(filtrarPorCategorias(lugares, activas), filtroServ),
@@ -96,28 +118,76 @@ export default function App() {
     return c
   }, [lugares])
 
-  // Elegir (o quitar) un lugar mantiene la URL compartible: /?lugar=id
-  const elegir = useCallback((id: string | null) => {
-    setSeleccionadoId(id)
-    const { pathname, search, hash } = window.location
-    window.history.replaceState(null, '', pathname + busquedaConLugar(search, id) + hash)
-  }, [])
+  // Elegir (o quitar) un lugar mantiene la URL compartible: /?campus=...&lugar=id
+  const elegir = useCallback(
+    (id: string | null) => {
+      setSeleccionadoId(id)
+      escribirUrl(campusId, id)
+    },
+    [campusId],
+  )
 
+  // Carga perezosa: solo se descargan los datos del campus que se está viendo.
   useEffect(() => {
-    cargarLugares(campus.id)
-      .then((ls) => {
-        setEstado({ fase: 'listo', lugares: ls })
-        // Enlace compartido: abre el lugar si existe; si el id no existe, se ignora.
-        const id = leerLugarDeUrl(window.location.search)
-        if (id && ls.some((l) => l.id === id)) setSeleccionadoId(id)
-      })
-      .catch((e: unknown) =>
-        setEstado({
-          fase: 'error',
-          mensaje: e instanceof Error ? e.message : 'Error desconocido',
-        }),
-      )
-  }, [campus.id])
+    let vigente = true
+    async function cargar() {
+      try {
+        const [ls, lim] = await Promise.all([
+          cargarLugares(campusId),
+          cargarLimite(campusId),
+        ])
+        if (!vigente) return
+        setCarga({ campusId, fase: 'listo', lugares: ls, limite: lim })
+        const pendiente = lugarPendiente.current
+        if (!pendiente) return
+        if (ls.some((l) => l.id === pendiente)) {
+          lugarPendiente.current = null
+          setSeleccionadoId(pendiente)
+          return
+        }
+        // Enlace sin campus: el lugar puede ser de otro campus; se busca en los demás.
+        if (!campusEnUrl.current) {
+          for (const otro of CAMPUS_LISTA) {
+            if (otro.id === campusId) continue
+            const otros = await cargarLugares(otro.id)
+            if (!vigente) return
+            if (otros.some((l) => l.id === pendiente)) {
+              campusEnUrl.current = true
+              setCampusId(otro.id)
+              escribirUrl(otro.id, pendiente)
+              return
+            }
+          }
+        }
+        lugarPendiente.current = null // el id no existe: se ignora
+      } catch (e) {
+        if (vigente)
+          setCarga({
+            campusId,
+            fase: 'error',
+            mensaje: e instanceof Error ? e.message : 'Error desconocido',
+          })
+      }
+    }
+    void cargar()
+    return () => {
+      vigente = false
+    }
+  }, [campusId])
+
+  function cambiarCampus(id: CampusId) {
+    if (id === campusId) return
+    lugarPendiente.current = null
+    // Lo que pertenece al campus anterior (selección, filtros, ruta) no se arrastra.
+    setCampusId(id)
+    setSeleccionadoId(null)
+    quitarFiltros()
+    setOrigen(null)
+    setDestino(null)
+    setPanelAbierto(false)
+    setHoyAbierto(false)
+    escribirUrl(id, null)
+  }
 
   function alternarCategoria(c: Categoria) {
     setActivas((previas) => {
@@ -243,6 +313,11 @@ export default function App() {
           aria-label="Filtrar por categoría"
           className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1"
         >
+          <SelectorCampus
+            campus={campusId}
+            opciones={CAMPUS_LISTA}
+            onCambiar={cambiarCampus}
+          />
           {CATEGORIAS.filter((c) => conteo.has(c)).map((c) => (
             <ChipCategoria
               key={c}
@@ -277,13 +352,14 @@ export default function App() {
       </div>
 
       <main className="relative flex-1">
-        {estado.fase === 'error' ? (
+        {actual?.fase === 'error' ? (
           <p role="alert" className="p-4">
-            No se pudieron cargar los lugares. {estado.mensaje}
+            No se pudieron cargar los lugares. {actual.mensaje}
           </p>
         ) : (
           <Mapa
             campus={campus}
+            limite={limite}
             lugares={visibles}
             seleccionado={seleccionado}
             onSeleccionar={alSeleccionarEnMapa}
@@ -291,7 +367,7 @@ export default function App() {
             ruta={rutaGeo}
           />
         )}
-        {estado.fase === 'cargando' && (
+        {actual === null && (
           <p
             role="status"
             className="absolute left-4 top-4 rounded-control bg-surface px-3 py-2"

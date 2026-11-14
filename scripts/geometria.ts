@@ -1,7 +1,7 @@
 /** Geometría mínima en metros (aproximación plana, suficiente para escalas de campus). */
 const M_POR_GRADO = 111_320
 
-type Punto = { lat: number; lng: number }
+export type Punto = { lat: number; lng: number }
 
 /** Distancia en metros entre dos puntos cercanos. */
 export function distanciaMetros(a: Punto, b: Punto): number {
@@ -55,4 +55,19 @@ export function distanciaAlBorde(p: Punto, anillo: Punto[]): number {
     mejor = Math.min(mejor, distanciaASegmento(p, anillo[i], anillo[i + 1]))
   }
   return mejor
+}
+
+/** ¿El punto está dentro de alguna de las parcelas del campus? */
+export function dentroDelPoligono(p: Punto, anillos: Punto[][]): boolean {
+  return anillos.some((a) => dentroDelAnillo(p, a))
+}
+
+/** Distancia en metros al campus (varias parcelas); 0 si está dentro de alguna. */
+export function distanciaAlPoligono(p: Punto, anillos: Punto[][]): number {
+  return Math.min(...anillos.map((a) => distanciaAlAnillo(p, a)))
+}
+
+/** Distancia al borde más cercano de cualquier parcela, esté el punto dentro o fuera. */
+export function distanciaAlBordeDelPoligono(p: Punto, anillos: Punto[][]): number {
+  return Math.min(...anillos.map((a) => distanciaAlBorde(p, a)))
 }

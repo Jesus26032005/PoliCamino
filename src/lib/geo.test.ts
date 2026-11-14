@@ -15,3 +15,27 @@ describe('dentroDeLimites', () => {
     expect(dentroDeLimites(19.514, -99.1402, limites, 0.01)).toBe(true)
   })
 })
+
+describe('cajaDeGeometria', () => {
+  it('Polygon y MultiPolygon (varias parcelas)', async () => {
+    const { cajaDeGeometria } = await import('./geo')
+    const a = [
+      [-99.2, 19.4],
+      [-99.1, 19.4],
+      [-99.1, 19.5],
+      [-99.2, 19.4],
+    ]
+    expect(cajaDeGeometria({ type: 'Polygon', coordinates: [a] })).toEqual([
+      -99.2, 19.4, -99.1, 19.5,
+    ])
+    const b = [
+      [-98.0, 20.0],
+      [-97.9, 20.0],
+      [-97.9, 20.1],
+      [-98.0, 20.0],
+    ]
+    expect(cajaDeGeometria({ type: 'MultiPolygon', coordinates: [[a], [b]] })).toEqual([
+      -99.2, 19.4, -97.9, 20.1,
+    ])
+  })
+})

@@ -1,14 +1,16 @@
 /**
  * Genera la lista de lugares que aceptan reportes de ocupación (el Worker rechaza cualquier otro id).
+ * Reúne todos los campus que haya en src/data.
  * Uso: npm run generar:ocupacion   (córrelo después de `npm run importar:osm`)
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { admiteOcupacion } from '../src/lib/ocupacion.ts'
 
-const lugares = JSON.parse(readFileSync('src/data/zacatenco.lugares.json', 'utf-8')) as {
-  id: string
-  categoria: Parameters<typeof admiteOcupacion>[0]
-}[]
+type Fila = { id: string; categoria: Parameters<typeof admiteOcupacion>[0] }
+
+const lugares = readdirSync('src/data')
+  .filter((f) => f.endsWith('.lugares.json'))
+  .flatMap((f) => JSON.parse(readFileSync(`src/data/${f}`, 'utf-8')) as Fila[])
 const ids = lugares
   .filter((l) => admiteOcupacion(l.categoria))
   .map((l) => l.id)

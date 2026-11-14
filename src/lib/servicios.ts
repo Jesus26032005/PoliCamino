@@ -4,7 +4,7 @@ import {
   type Atributo,
   type Lugar,
   type Servicios,
-} from './tipos'
+} from './tipos.ts'
 
 export const ETIQUETA_ENCHUFES = {
   muchos: 'Hay varios enchufes',

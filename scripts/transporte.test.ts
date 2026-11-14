@@ -51,8 +51,9 @@ describe('construirAccesosYTransporte', () => {
         }),
         nodo(3, 19.54, -99.1, { name: 'Lejana', railway: 'station', station: 'subway' }),
       ],
-      anillo,
+      [anillo],
       '2026-01-01',
+      'zacatenco',
     )
     expect(r.map((l) => l.nombre)).toEqual(['Metro Politécnico'])
     expect(r[0].verificado).toBe(false)
@@ -71,8 +72,9 @@ describe('construirAccesosYTransporte', () => {
         nodo(3, 19.505, -99.1395, { highway: 'bus_stop' }),
         nodo(4, 19.52, -99.12, { name: 'Lejos', highway: 'bus_stop' }),
       ],
-      anillo,
+      [anillo],
       '2026-01-01',
+      'zacatenco',
     )
     expect(r).toHaveLength(1)
     expect(r[0].nombre).toBe('Parada ESCOM')
@@ -87,8 +89,9 @@ describe('construirAccesosYTransporte', () => {
         nodo(13, 19.506, -99.1399, { barrier: 'gate', access: 'private' }),
       ],
       [nodo(20, 19.5051, -99.1399, { name: 'Bátiz', highway: 'bus_stop' })],
-      anillo,
+      [anillo],
       '2026-01-01',
+      'zacatenco',
     )
     const accesos = r.filter((l) => l.categoria === 'acceso')
     expect(accesos).toHaveLength(1)

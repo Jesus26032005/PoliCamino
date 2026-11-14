@@ -50,7 +50,7 @@ export const cargarClima =
   (centro: LatLng): Cargador<Clima> =>
   (signal, forzar) =>
     conCache(
-      'clima',
+      `clima:${centro.join(',')}`, // la clave incluye el campus: cada uno tiene su clima
       TTL.clima,
       async () => leerClima(await json(urlClima(centro), signal)),
       { forzar },
@@ -60,7 +60,7 @@ export const cargarAire =
   (centro: LatLng): Cargador<Aire> =>
   (signal, forzar) =>
     conCache(
-      'aire',
+      `aire:${centro.join(',')}`,
       TTL.aire,
       async () => leerAire(await json(urlAire(centro), signal)),
       { forzar },

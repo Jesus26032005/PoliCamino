@@ -8,7 +8,7 @@ export function CompartirLugar({ lugar }: { lugar: Lugar }) {
   const [aviso, setAviso] = useState('')
 
   async function compartir() {
-    const url = enlaceDeLugar(lugar.id, window.location)
+    const url = enlaceDeLugar(lugar.id, window.location, lugar.campusId)
     try {
       if (navigator.share) {
         await navigator.share({ title: lugar.nombre, url })

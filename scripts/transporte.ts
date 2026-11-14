@@ -1,6 +1,10 @@
-import type { Lugar } from '../src/lib/tipos.ts'
+import type { CampusId, Lugar } from '../src/lib/tipos.ts'
 import type { TagsOSM } from './clasificar.ts'
-import { distanciaAlAnillo, distanciaAlBorde, distanciaMetros } from './geometria.ts'
+import {
+  distanciaAlBordeDelPoligono,
+  distanciaAlPoligono,
+  distanciaMetros,
+} from './geometria.ts'
 
 export type ElementoOSM = {
   type: 'node' | 'way' | 'relation'
@@ -33,11 +37,12 @@ function base(
   e: ElementoOSM,
   p: Punto,
   hoy: string,
+  campusId: CampusId,
   extra: Pick<Lugar, 'nombre' | 'categoria' | 'descripcion'>,
 ): Lugar {
   return {
     id: `osm-${prefijo[e.type]}${e.id}`,
-    campusId: 'zacatenco',
+    campusId,
     coordenadas: [Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))],
     fuente: `OpenStreetMap ${e.type}/${e.id} (ODbL), consultado ${hoy}`,
     verificado: false,
@@ -66,8 +71,9 @@ const esTrolebus = (t: TagsOSM) =>
 export function construirAccesosYTransporte(
   puertas: ElementoOSM[],
   transporte: ElementoOSM[],
-  anillo: Punto[],
+  anillos: Punto[][],
   hoy: string,
+  campusId: CampusId,
 ): Lugar[] {
   const lugares: Lugar[] = []
 
@@ -79,7 +85,7 @@ export function construirAccesosYTransporte(
     const t = e.tags ?? {}
     const p = punto(e)
     if (!p || !t.name) continue
-    const d = distanciaAlAnillo(p, anillo)
+    const d = distanciaAlPoligono(p, anillos)
     const aprox = textoDistancia(d)
 
     if (t.railway === 'station' && t.station === 'subway') {
@@ -87,7 +93,7 @@ export function construirAccesosYTransporte(
       if (d > MAX_METRO_M || nombresVistos.has(nombre)) continue
       nombresVistos.add(nombre)
       lugares.push(
-        base(e, p, hoy, {
+        base(e, p, hoy, campusId, {
           nombre,
           categoria: 'transporte',
           descripcion: `Estación del Metro (STC). ${aprox}`,
@@ -98,7 +104,7 @@ export function construirAccesosYTransporte(
       nombresVistos.add(t.name)
       const op = esTrolebus(t) ? ' de trolebús' : ' de autobuses'
       lugares.push(
-        base(e, p, hoy, {
+        base(e, p, hoy, campusId, {
           nombre: t.name,
           categoria: 'transporte',
           descripcion: `Estación${op}. ${aprox}`,
@@ -111,7 +117,7 @@ export function construirAccesosYTransporte(
       if (paradas.some((x) => x.lugar.nombre === nombre && distanciaMetros(x.p, p) < 15))
         continue
       const tipo = esTrolebus(t) ? 'trolebús' : 'transporte público'
-      const lugar = base(e, p, hoy, {
+      const lugar = base(e, p, hoy, campusId, {
         nombre,
         categoria: 'transporte',
         descripcion: `Parada de ${tipo} (según OSM). ${aprox}`,
@@ -130,7 +136,7 @@ export function construirAccesosYTransporte(
         x.p !== null &&
         ['gate', 'lift_gate'].includes(t.barrier ?? '') &&
         !['no', 'private'].includes(t.access ?? '') &&
-        distanciaAlBorde(x.p, anillo) <= MAX_ACCESO_M
+        distanciaAlBordeDelPoligono(x.p, anillos) <= MAX_ACCESO_M
       )
     })
     .sort((a, b) => a.e.id - b.e.id)
@@ -162,7 +168,7 @@ export function construirAccesosYTransporte(
     usados.set(nombre, n)
     if (n > 1) nombre += ` (${n})`
     lugares.push({
-      ...base(g.e, centro, hoy, {
+      ...base(g.e, centro, hoy, campusId, {
         nombre,
         categoria: 'acceso',
         descripcion:

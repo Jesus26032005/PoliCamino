@@ -1,5 +1,5 @@
-import { aplicarServicios } from './servicios'
-import { CATEGORIAS, type CampusId, type Lugar } from './tipos'
+import { aplicarServicios } from './servicios.ts'
+import { CATEGORIAS, type CampusId, type Lugar } from './tipos.ts'
 
 /** Devuelve la lista de problemas de un lugar (vacía si es válido). */
 export function validarLugar(x: unknown): string[] {
@@ -50,14 +50,36 @@ export function validarLugares(x: unknown): Lugar[] {
 }
 
 /** Carga perezosa por campus: cada campus es su propio archivo. */
-const CARGADORES: Partial<Record<CampusId, () => Promise<{ default: unknown }>>> = {
+type Cargador = () => Promise<{ default: unknown }>
+const CARGADORES: Record<CampusId, Cargador> = {
   zacatenco: () => import('../data/zacatenco.lugares.json'),
+  'santo-tomas': () => import('../data/santo-tomas.lugares.json'),
 }
 
-const CARGADORES_SERVICIOS: Partial<
-  Record<CampusId, () => Promise<{ default: unknown }>>
-> = {
+const CARGADORES_SERVICIOS: Record<CampusId, Cargador> = {
   zacatenco: () => import('../data/zacatenco.servicios.json'),
+  'santo-tomas': () => import('../data/santo-tomas.servicios.json'),
+}
+
+const CARGADORES_LIMITE: Record<CampusId, Cargador> = {
+  zacatenco: () => import('../data/zacatenco.limite.json'),
+  'santo-tomas': () => import('../data/santo-tomas.limite.json'),
+}
+
+export type LimiteGeoJSON = {
+  type: 'Feature'
+  properties: Record<string, unknown>
+  geometry:
+    | { type: 'Polygon'; coordinates: number[][][] }
+    | { type: 'MultiPolygon'; coordinates: number[][][][] }
+}
+
+/** Polígono del campus (GeoJSON), cargado solo cuando se necesita. */
+export async function cargarLimite(campusId: CampusId): Promise<LimiteGeoJSON> {
+  const limite = (await CARGADORES_LIMITE[campusId]()).default as LimiteGeoJSON
+  if (!limite?.geometry || !['Polygon', 'MultiPolygon'].includes(limite.geometry.type))
+    throw new Error(`El polígono del campus "${campusId}" no es válido`)
+  return limite
 }
 
 export async function cargarLugares(campusId: CampusId): Promise<Lugar[]> {
@@ -65,7 +87,7 @@ export async function cargarLugares(campusId: CampusId): Promise<Lugar[]> {
   if (!cargar) throw new Error(`Aún no hay datos para el campus "${campusId}"`)
   const [lugares, servicios] = await Promise.all([
     cargar(),
-    CARGADORES_SERVICIOS[campusId]?.() ?? Promise.resolve({ default: {} }),
+    CARGADORES_SERVICIOS[campusId](),
   ])
   return aplicarServicios(validarLugares(lugares.default), servicios.default)
 }

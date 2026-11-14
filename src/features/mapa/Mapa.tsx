@@ -8,8 +8,7 @@ import {
 } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef } from 'react'
-import limiteZacatenco from '../../data/zacatenco.limite.json'
-import { dentroDeLimites } from '../../lib/geo'
+import { cajaDeGeometria, dentroDeLimites } from '../../lib/geo'
 import { lugaresAGeoJSON } from '../../lib/lugares'
 import { RUTA_VACIA, type RutaGeoJSON } from '../../lib/ruta'
 import { leerToken, useTemaOscuro } from '../../lib/tema'
@@ -20,14 +19,6 @@ import { registrarIconos } from './iconos'
 const ESTILO_CLARO = 'https://tiles.openfreemap.org/styles/positron'
 const ESTILO_OSCURO = 'https://tiles.openfreemap.org/styles/dark'
 
-/** Caja [oeste, sur, este, norte] del polígono del campus. */
-function cajaDelLimite(): [number, number, number, number] {
-  const anillo = (limiteZacatenco.geometry.coordinates as number[][][])[0]
-  const lngs = anillo.map((p) => p[0])
-  const lats = anillo.map((p) => p[1])
-  return [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)]
-}
-
 /** Grados extra alrededor de `campus.limites` en los que se puede navegar. */
 const HOLGURA = 0.02
 
@@ -35,8 +26,18 @@ const FUENTE = 'lugares'
 const RUTA = 'ruta'
 const LIMITE = 'campus-limite'
 
+/** Polígono del campus en GeoJSON (Polygon o MultiPolygon). */
+export type LimiteCampus = {
+  type: 'Feature'
+  properties: Record<string, unknown>
+  geometry: Parameters<typeof cajaDeGeometria>[0]
+}
+const SIN_LIMITE = { type: 'FeatureCollection', features: [] } as const
+
 type Props = {
   campus: Campus
+  /** Polígono del campus; null mientras se carga. */
+  limite: LimiteCampus | null
   /** Lugares visibles (ya filtrados). */
   lugares: Lugar[]
   seleccionado: Lugar | null
@@ -54,11 +55,12 @@ function instalarCapas(
   lugares: Lugar[],
   seleccionadoId: string | null,
   ruta: RutaGeoJSON,
+  limite: LimiteCampus | null,
 ) {
   registrarIconos(map)
   const primario = leerToken('--c-primary')
 
-  map.addSource(LIMITE, { type: 'geojson', data: limiteZacatenco as never })
+  map.addSource(LIMITE, { type: 'geojson', data: (limite ?? SIN_LIMITE) as never })
   map.addLayer({
     id: `${LIMITE}-relleno`,
     type: 'fill',
@@ -159,6 +161,7 @@ function instalarCapas(
 
 export function Mapa({
   campus,
+  limite,
   lugares,
   seleccionado,
   onSeleccionar,
@@ -169,28 +172,22 @@ export function Mapa({
   const contenedor = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapaGL | null>(null)
   const oscuro = useTemaOscuro()
+  const campus0 = useRef(campus) // posición inicial de la cámara
 
   // Los manejadores se registran una sola vez; leen siempre lo más reciente.
-  const ultimo = useRef({ lugares, seleccionadoId, onSeleccionar, oscuro, ruta })
+  const ultimo = useRef({ lugares, seleccionadoId, onSeleccionar, oscuro, ruta, limite })
   useEffect(() => {
-    ultimo.current = { lugares, seleccionadoId, onSeleccionar, oscuro, ruta }
+    ultimo.current = { lugares, seleccionadoId, onSeleccionar, oscuro, ruta, limite }
   })
 
+  // El mapa se crea una sola vez; al cambiar de campus solo se mueve la cámara.
   useEffect(() => {
-    const [[s, o], [n, e]] = campus.limites
     const map = new MapaGL({
       container: contenedor.current!,
       style: ultimo.current.oscuro ? ESTILO_OSCURO : ESTILO_CLARO,
-      // Vista inicial: todo el campus, sea cual sea el tamaño de la pantalla.
-      bounds: cajaDelLimite(),
-      fitBoundsOptions: { padding: 24 },
+      center: [campus0.current.centro[1], campus0.current.centro[0]],
+      zoom: campus0.current.zoom,
       minZoom: 13,
-      // Holgura extra: con una caja ajustada, en pantallas verticales el mapa
-      // no dejaría alejar lo suficiente para ver todo el campus.
-      maxBounds: [
-        [o - HOLGURA, s - HOLGURA],
-        [e + HOLGURA, n + HOLGURA],
-      ],
       attributionControl: false,
     })
     mapRef.current = map
@@ -201,7 +198,7 @@ export function Mapa({
     // Se dispara en la carga inicial y cada vez que cambia el estilo (tema).
     map.on('style.load', () => {
       const u = ultimo.current
-      instalarCapas(map, u.lugares, u.seleccionadoId, u.ruta ?? RUTA_VACIA)
+      instalarCapas(map, u.lugares, u.seleccionadoId, u.ruta ?? RUTA_VACIA, u.limite)
     })
 
     map.on('click', 'lugares-puntos', (ev) => {
@@ -231,7 +228,42 @@ export function Mapa({
       map.remove()
       mapRef.current = null
     }
-  }, [campus])
+  }, [])
+
+  // Encuadre y límites de navegación del campus actual (también al cambiar de campus).
+  const encuadrado = useRef<string | null>(null)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !limite) return
+    const [[s, o], [n, e]] = campus.limites
+    const primera = encuadrado.current === null
+    if (encuadrado.current === campus.id) return
+    encuadrado.current = campus.id
+    const [oeste, sur, este, norte] = cajaDeGeometria(limite.geometry)
+    // Sin límites mientras vuela; se fijan al llegar para que no recorten el viaje.
+    map.setMaxBounds(null)
+    map.fitBounds(
+      [
+        [oeste, sur],
+        [este, norte],
+      ],
+      { padding: 24, duration: primera ? 0 : 1400 },
+    )
+    const fijar = () =>
+      // Holgura extra: con una caja ajustada, en pantallas verticales no se vería todo el campus.
+      map.setMaxBounds([
+        [o - HOLGURA, s - HOLGURA],
+        [e + HOLGURA, n + HOLGURA],
+      ])
+    if (primera) fijar()
+    else map.once('moveend', fijar)
+  }, [campus, limite])
+
+  // El polígono dibujado sigue al campus.
+  useEffect(() => {
+    const fuente = mapRef.current?.getSource(LIMITE) as GeoJSONSource | undefined
+    fuente?.setData((limite ?? SIN_LIMITE) as never)
+  }, [limite])
 
   // Cambio de tema: otro estilo base; las capas se reinstalan en 'style.load'.
   const primeraVez = useRef(true)

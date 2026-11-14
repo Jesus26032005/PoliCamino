@@ -225,12 +225,14 @@ describe('GET /api/ocupacion', () => {
 })
 
 describe('lista de lugares con ocupación', () => {
-  it('está sincronizada con los datos (si falla: npm run generar:ocupacion)', async () => {
-    const { default: lugares } = await import('../../src/data/zacatenco.lugares.json')
-    const { default: ids } = await import('./ids-ocupacion.json')
+  it('está sincronizada con los datos de todos los campus (si falla: npm run generar:ocupacion)', async () => {
+    const { CAMPUS_LISTA } = await import('../../src/data/campus.ts')
+    const { cargarLugares } = await import('../../src/lib/lugares.ts')
     const { admiteOcupacion } = await import('../../src/lib/ocupacion.ts')
-    const esperados = lugares
-      .filter((l) => admiteOcupacion(l.categoria as never))
+    const { default: ids } = await import('./ids-ocupacion.json')
+    const esperados = (await Promise.all(CAMPUS_LISTA.map((c) => cargarLugares(c.id))))
+      .flat()
+      .filter((l) => admiteOcupacion(l.categoria))
       .map((l) => l.id)
       .sort()
     expect(ids).toEqual(esperados)

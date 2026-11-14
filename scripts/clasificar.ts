@@ -6,11 +6,12 @@ const RE = {
   biblioteca: /^biblioteca/i,
   deporte: /gimnasio|cancha|alberca|\bcampo\b|estadio|dojo/i,
   cafeteria: /cafeter|barra de caf/i,
-  cultura: /centro cultural|auditorio|planetario|monumento|plaza/i,
+  cultura: /centro cultural|centro hist[oó]rico|auditorio|planetario|monumento|plaza/i,
   servicio:
     /servicios m[eé]dicos|farmacia|librer[ií]a|ventanilla|administraci[oó]n escolar|^(direcci[oó]n|secretar[ií]a|coordinaci[oó]n|divisi[oó]n)/i,
   laboratorio: /laborator|estaci[oó]n meteorol/i,
-  escuela: /^(escuela|edificio|edif\.|centro de (investigaci|innovaci|lenguas))/i,
+  escuela:
+    /^(escuela|edificio|edif\.|centro de (investigaci|innovaci|lenguas|estudios cient))/i,
   campusMismo: /^Instituto Polit[eé]cnico Nacional Unidad/i,
 }
 
@@ -46,9 +47,14 @@ export function clasificar(t: TagsOSM): Categoria | null {
     return 'cafeteria'
   if (t.amenity === 'toilets') return 'baños'
   if (
-    ['theatre', 'planetarium', 'arts_centre', 'conference_centre', 'cinema'].includes(
-      t.amenity,
-    ) ||
+    [
+      'theatre',
+      'planetarium',
+      'arts_centre',
+      'conference_centre',
+      'cinema',
+      'events_venue',
+    ].includes(t.amenity) ||
     t.historic ||
     RE.cultura.test(nombre)
   )
@@ -86,6 +92,16 @@ const ALIAS: [RegExp, string[]][] = [
   [/^Centro de Innovaci[oó]n y Desarrollo Tecnol[oó]gico en C[oó]mputo/i, ['CIDETEC']],
   [/^Escuela Nacional de Ciencias Biol[oó]gicas/i, ['ENCB']],
   [/^Direcci[oó]n de Administraci[oó]n Escolar/i, ['DAE']],
+  [/^Escuela Superior de Medicina/i, ['ESM']],
+  [/^Escuela Superior de Econom[ií]a/i, ['ESE']],
+  [/^Escuela Superior de Comercio y Administraci[oó]n/i, ['ESCA']],
+  [/^Escuela Superior de Enfermer[ií]a/i, ['ESEO']],
+  [/^Centro Interdisciplinario de Ciencias de la Salud/i, ['CICS']],
+  [
+    /^Centro de Estudios Cient[ií]ficos y Tecnol[oó]gicos (N[°o.]+ ?)?11\b/i,
+    ['CECYT 11'],
+  ],
+  [/^Centro de Lenguas Extranjeras/i, ['CENLEX']],
 ]
 
 export function aliasPara(nombre: string): string[] | undefined {

@@ -27,6 +27,40 @@ describe('clasificar', () => {
   })
 })
 
+describe('clasificar (Santo Tomás)', () => {
+  it('CECyT y centros culturales ya no caen en "otro"', () => {
+    expect(
+      clasificar({
+        name: 'Centro de Estudios Científicos y Tecnológicos N° 11 "Wilfrido Massieu" IPN',
+        building: 'university',
+      }),
+    ).toBe('escuela')
+    expect(
+      clasificar({
+        name: 'Centro Histórico y Cultural "Juan de Dios Bátiz" IPN',
+        amenity: 'events_venue',
+      }),
+    ).toBe('cultura')
+  })
+})
+
+describe('aliasPara (más siglas)', () => {
+  it('reconoce las escuelas del Casco de Santo Tomás', () => {
+    expect(aliasPara('Escuela Superior de Medicina')).toEqual(['ESM'])
+    expect(aliasPara('Escuela Superior de Economía')).toEqual(['ESE'])
+    expect(aliasPara('Escuela Superior de Comercio y Administración')).toEqual(['ESCA'])
+    expect(aliasPara('Escuela Superior de Enfermería y Obstretricia')).toEqual(['ESEO'])
+    expect(
+      aliasPara(
+        'Centro de Estudios Científicos y Tecnológicos N° 11 "Wilfrido Massieu" IPN',
+      ),
+    ).toEqual(['CECYT 11'])
+    expect(aliasPara('Centro de Lenguas Extranjeras Unidad Santo Tomás')).toEqual([
+      'CENLEX',
+    ])
+  })
+})
+
 describe('aliasPara', () => {
   it('reconoce ESCOM', () => {
     expect(aliasPara('Escuela Superior de Cómputo')).toEqual(['ESCOM'])

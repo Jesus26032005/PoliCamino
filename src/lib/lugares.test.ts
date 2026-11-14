@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { CAMPUS } from '../data/campus'
-import datos from '../data/zacatenco.lugares.json'
-import { dentroDeLimites } from './geo'
-import { cargarLugares, lugaresAGeoJSON, validarLugar, validarLugares } from './lugares'
+import { CAMPUS_LISTA } from '../data/campus'
+import { cajaDeGeometria, dentroDeLimites } from './geo'
+import {
+  cargarLimite,
+  cargarLugares,
+  lugaresAGeoJSON,
+  validarLugar,
+  validarLugares,
+} from './lugares'
 import type { Lugar } from './tipos'
 
 const base: Lugar = {
@@ -42,41 +47,64 @@ describe('lugaresAGeoJSON', () => {
   })
 })
 
-describe('datos de Zacatenco', () => {
-  it('cargan y son válidos', async () => {
-    const lugares = await cargarLugares('zacatenco')
+describe.each(CAMPUS_LISTA)('datos de $nombre', (campus) => {
+  it('cargan, son válidos y todos pertenecen al campus', async () => {
+    const lugares = await cargarLugares(campus.id)
     expect(lugares.length).toBeGreaterThan(30)
+    expect(lugares.every((l) => l.campusId === campus.id)).toBe(true)
   })
-  it('están dentro de los límites del campus (con holgura para el transporte cercano)', () => {
-    for (const l of datos) {
+  it('están dentro de los límites del campus (con holgura para el transporte cercano)', async () => {
+    for (const l of await cargarLugares(campus.id)) {
       expect(
-        dentroDeLimites(
-          l.coordenadas[0],
-          l.coordenadas[1],
-          CAMPUS.zacatenco.limites,
-          0.01,
-        ),
+        dentroDeLimites(l.coordenadas[0], l.coordenadas[1], campus.limites, 0.01),
       ).toBe(true)
     }
   })
-  it('hay accesos, Metro y paradas, todos con fuente y sin verificar', () => {
+  it('el polígono carga y cabe dentro de los límites declarados', async () => {
+    const [oeste, sur, este, norte] = cajaDeGeometria(
+      (await cargarLimite(campus.id)).geometry,
+    )
+    const [[s, o], [n, e]] = campus.limites
+    expect(sur).toBeGreaterThan(s)
+    expect(norte).toBeLessThan(n)
+    expect(oeste).toBeGreaterThan(o)
+    expect(este).toBeLessThan(e)
+  })
+  it('hay accesos y Metro, todos con fuente y sin verificar', async () => {
+    const datos = await cargarLugares(campus.id)
     const cats = (c: string) => datos.filter((l) => l.categoria === c)
     expect(cats('acceso').length).toBeGreaterThan(0)
     expect(cats('transporte').some((l) => l.nombre.startsWith('Metro '))).toBe(true)
-    expect(cats('transporte').some((l) => l.nombre.startsWith('Parada '))).toBe(true)
     for (const l of [...cats('acceso'), ...cats('transporte')]) {
       expect(l.fuente).toMatch(/OpenStreetMap/)
       expect(l.verificado).toBe(false)
     }
   })
-  it('incluye ESCOM', () => {
-    const escom = datos.find((l) => l.alias?.includes('ESCOM'))
+  it('nada importado de OSM está marcado como verificado ni trae horario sin fuente', async () => {
+    const datos = await cargarLugares(campus.id)
+    expect(datos.filter((l) => l.verificado)).toEqual([])
+    expect(datos.filter((l) => l.horario !== undefined)).toEqual([])
+  })
+})
+
+describe('siglas clave por campus', () => {
+  it('Zacatenco incluye ESCOM', async () => {
+    const escom = (await cargarLugares('zacatenco')).find((l) =>
+      l.alias?.includes('ESCOM'),
+    )
     expect(escom?.nombre).toBe('Escuela Superior de Cómputo')
   })
-  it('nada importado de OSM está marcado como verificado', () => {
-    expect(datos.filter((l) => l.verificado)).toEqual([])
+  it('Santo Tomás incluye ENCB, ESM, ESE y ESCA', async () => {
+    const ls = await cargarLugares('santo-tomas')
+    for (const sigla of ['ENCB', 'ESM', 'ESE', 'ESCA']) {
+      expect(
+        ls.some((l) => l.alias?.includes(sigla)),
+        sigla,
+      ).toBe(true)
+    }
   })
-  it('ninguno trae horario sin fuente', () => {
-    expect(datos.filter((l) => 'horario' in l)).toEqual([])
+  it('un id de un campus no aparece en el otro', async () => {
+    const a = new Set((await cargarLugares('zacatenco')).map((l) => l.id))
+    for (const l of await cargarLugares('santo-tomas')) expect(a.has(l.id)).toBe(false)
   })
 })
