@@ -37,9 +37,9 @@ export function OcupacionLugar({ lugarId }: { lugarId: string }) {
   return (
     <section
       aria-label="Ocupación según estudiantes"
-      className="flex flex-col gap-2 rounded-control border border-border p-3"
+      className="flex flex-col gap-2 rounded-card border border-border bg-soft p-4"
     >
-      <h3 className="font-semibold">Ocupación según estudiantes</h3>
+      <h3 className="font-display font-semibold">Ocupación según estudiantes</h3>
 
       {estado.fase === 'cargando' && <p role="status">Cargando…</p>}
       {estado.fase === 'error' && (

@@ -110,7 +110,7 @@ function ResultadoRuta({ estado }: { estado: EstadoRuta }) {
     )
   return (
     <div role="status" className="flex flex-col gap-1">
-      <p className="text-title font-bold">
+      <p className="font-display text-title font-bold leading-tight">
         {formatearDistancia(estado.ruta.distanciaM)} ·{' '}
         {formatearDuracion(estado.ruta.duracionS)} a pie
       </p>

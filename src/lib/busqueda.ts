@@ -85,3 +85,11 @@ export function filtrarPorCategorias(
 ): Lugar[] {
   return activas.size === 0 ? lugares : lugares.filter((l) => activas.has(l.categoria))
 }
+
+/** Quita los lugares de las categorías apagadas (vacío = se ve todo). */
+export function ocultarCategorias(
+  lugares: Lugar[],
+  apagadas: ReadonlySet<Categoria>,
+): Lugar[] {
+  return apagadas.size === 0 ? lugares : lugares.filter((l) => !apagadas.has(l.categoria))
+}

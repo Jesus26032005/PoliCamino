@@ -8,6 +8,7 @@ export const CAMPUS: Record<CampusId, Campus> = {
   zacatenco: {
     id: 'zacatenco',
     nombre: 'Zacatenco',
+    nombreLargo: 'Unidad Profesional Adolfo López Mateos',
     centro: [19.5019, -99.1402],
     zoom: 15,
     // Polígono: OSM way/81453020.
@@ -19,6 +20,7 @@ export const CAMPUS: Record<CampusId, Campus> = {
   'santo-tomas': {
     id: 'santo-tomas',
     nombre: 'Santo Tomás',
+    nombreLargo: 'Casco de Santo Tomás',
     centro: [19.4535, -99.1687],
     zoom: 16,
     // Polígono: OSM relation/12512609 (Casco de Santo Tomás, 4 parcelas).

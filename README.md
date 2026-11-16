@@ -22,7 +22,7 @@ npm run build      # build de producción
 - `src/features/`: funciones por dominio (mapa, búsqueda...).
 - `src/data/`: datos en JSON (lugares por campus).
 
-Estado: Fase 6 (multicampus: Zacatenco y Santo Tomás).
+Estado: Fase 6 (multicampus) + rediseño de la interfaz para PC y móvil.
 
 ## Datos
 
@@ -153,3 +153,16 @@ llevan el campus (`/?campus=santo-tomas&lugar=id`); si un enlace trae solo `luga
    verificados) y `npm run dev` te deja verlo en el selector. Haz commit de los JSON generados.
 
 Reimportar un campus sobrescribe `lugares.json` y `limite.json`, **nunca** `servicios.json`.
+
+## Diseño de la interfaz
+
+El mapa ocupa toda la pantalla y el resto flota encima:
+
+- **Barra superior** (`App.tsx`): marca, selector de campus, accesos rápidos (escritorio) o buscador (móvil),
+  aviso de proyecto no oficial, clima y «¿Dónde estoy?».
+- **Panel** (`components/Panel.tsx`): pestañas Lugares · Cómo llegar · Hoy. En escritorio (≥ 56rem) es un panel
+  lateral; en móvil es una hoja inferior con tres alturas (mínima, media, expandida). Los tamaños viven en `.panel`
+  (`styles/index.css`) y deben coincidir con `rellenoDelMapa()` en `App.tsx`, que le dice al mapa qué zona queda libre.
+- **Tokens** (`styles/tokens.css`): colores claro/oscuro, radios, tipografías (Inter para texto, Space Grotesk
+  para títulos y cifras) y el punto de corte `desk`. Los componentes solo usan esas clases.
+- Los controles de MapLibre (zoom y atribución de OSM) suben con la hoja inferior para no quedar tapados.

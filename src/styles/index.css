@@ -16,9 +16,117 @@
   }
 }
 
-/* La atribución de OSM (arriba a la izquierda) no debe pasar bajo los botones de zoom. */
-.maplibregl-ctrl-top-left {
-  max-width: calc(100% - 3.5rem);
+@layer components {
+  /* Superficie flotante sobre el mapa: barra superior, botones, píldoras. */
+  .flotante {
+    background: var(--c-panel);
+    border: 1px solid var(--c-border);
+    box-shadow: var(--shadow-flotante);
+    backdrop-filter: blur(18px) saturate(140%);
+  }
+
+  /* Etiqueta pequeña en mayúsculas para títulos de sección. */
+  .rotulo {
+    font-size: var(--text-mini);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+  }
+
+  /*
+   * PANEL — en móvil es una hoja inferior con tres alturas (data-estado);
+   * en escritorio es un panel lateral fijo a la izquierda.
+   */
+  .panel {
+    --panel-min: 5.5rem;
+    position: absolute;
+    z-index: 20;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--c-panel);
+    border: 1px solid var(--c-border);
+    border-bottom: 0;
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    box-shadow: var(--shadow-sheet);
+    backdrop-filter: blur(18px) saturate(140%);
+    transition: top 0.28s cubic-bezier(0.2, 0.7, 0.1, 1);
+  }
+  .panel[data-estado='min'] {
+    top: calc(100% - var(--panel-min));
+  }
+  .panel[data-estado='medio'] {
+    top: 54%;
+  }
+  .panel[data-estado='max'] {
+    top: 6.75rem;
+  }
+
+  /* Lo que flota justo debajo de la barra superior (resumen de ruta, avisos). */
+  .bajo-barra {
+    position: absolute;
+    z-index: 10;
+    left: 0.75rem;
+    right: 0.75rem;
+    top: 6.75rem;
+  }
+
+  @media (min-width: 56rem) {
+    .panel,
+    .panel[data-estado] {
+      left: 0.875rem;
+      right: auto;
+      top: 5rem;
+      bottom: 0.875rem;
+      width: var(--spacing-panel);
+      border-bottom: 1px solid var(--c-border);
+      border-radius: var(--radius-sheet);
+    }
+    .bajo-barra {
+      left: calc(var(--spacing-panel) + 1.75rem);
+      right: 0.875rem;
+      top: 5rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .panel {
+      transition: none;
+    }
+  }
+}
+
+/*
+ * Controles de MapLibre (zoom y atribución de OSM): siempre visibles.
+ * En móvil suben para quedar encima de la hoja inferior (--mapa-abajo).
+ */
+.app {
+  --mapa-abajo: 0px;
+}
+.app[data-hoja='min'] {
+  --mapa-abajo: 5.5rem;
+}
+.app[data-hoja='medio'],
+.app[data-hoja='max'] {
+  --mapa-abajo: 46%;
+}
+@media (min-width: 56rem) {
+  .app[data-hoja] {
+    --mapa-abajo: 0px;
+  }
+}
+/* `.app` delante: gana a la hoja de estilos de MapLibre, que se carga después. */
+.app .maplibregl-ctrl-bottom-right {
+  bottom: var(--mapa-abajo);
+  transition: bottom 0.28s cubic-bezier(0.2, 0.7, 0.1, 1);
+}
+.maplibregl-ctrl-group {
+  border-radius: var(--radius-control) !important;
+  overflow: hidden;
 }
 
 /* Punto azul de "¿Dónde estoy?" */

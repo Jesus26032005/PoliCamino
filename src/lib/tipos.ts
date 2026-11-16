@@ -22,6 +22,8 @@ export type CampusId = 'zacatenco' | 'santo-tomas'
 export type Campus = {
   id: CampusId
   nombre: string
+  /** Nombre completo de la unidad (como aparece en OpenStreetMap). */
+  nombreLargo: string
   centro: LatLng
   zoom: number
   /** Esquinas [suroeste, noreste]. */

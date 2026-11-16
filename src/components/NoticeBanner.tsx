@@ -1,15 +1,14 @@
 import { DISCLAIMER_TEXT, DISCLAIMER_TITLE } from '../lib/config'
 
-/** Aviso visible de que el proyecto no es oficial del IPN. */
-export function NoticeBanner({ compacto = false }: { compacto?: boolean }) {
+/** Aviso siempre visible de que el proyecto no es oficial del IPN. */
+export function NoticeBanner({ className = '' }: { className?: string }) {
   return (
-    <aside
+    <p
       role="note"
-      aria-label={DISCLAIMER_TITLE}
-      className={`bg-notice-bg text-small text-notice-text ${compacto ? 'px-4 py-2' : 'rounded-card p-4'}`}
+      title={DISCLAIMER_TEXT}
+      className={`inline-flex min-h-7 items-center rounded-pill bg-notice-bg px-3 text-mini font-semibold text-notice-text shadow-flotante ${className}`}
     >
-      <strong className="font-semibold">{DISCLAIMER_TITLE}.</strong>{' '}
-      {compacto ? 'No pertenece al IPN.' : DISCLAIMER_TEXT}
-    </aside>
+      {DISCLAIMER_TITLE} · No pertenece al IPN
+    </p>
   )
 }

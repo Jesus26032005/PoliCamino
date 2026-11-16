@@ -45,7 +45,24 @@ type Props = {
   ubicacion: Ubicacion | null
   /** Ruta a dibujar (línea + origen y destino) o null. */
   ruta: RutaGeoJSON | null
+  /** Espacio (px) que tapan la barra y el panel en cada borde, para encuadrar lo visible. */
+  obtenerRelleno: () => Relleno
 }
+
+export type Relleno = { top: number; right: number; bottom: number; left: number }
+
+const conMargen = (r: Relleno, m: number): Relleno => ({
+  top: r.top + m,
+  right: r.right + m,
+  bottom: r.bottom + m,
+  left: r.left + m,
+})
+
+/** Desplazamiento que centra un punto en la zona libre del mapa (no en toda la pantalla). */
+const centroLibre = (r: Relleno): [number, number] => [
+  (r.left - r.right) / 2,
+  (r.top - r.bottom) / 2,
+]
 
 const tamanoIcono = (seleccionadoId: string | null) =>
   ['case', ['==', ['get', 'id'], seleccionadoId ?? ''], 1.3, 1] as never
@@ -167,6 +184,7 @@ export function Mapa({
   onSeleccionar,
   ubicacion,
   ruta,
+  obtenerRelleno,
 }: Props) {
   const seleccionadoId = seleccionado?.id ?? null
   const contenedor = useRef<HTMLDivElement>(null)
@@ -175,9 +193,25 @@ export function Mapa({
   const campus0 = useRef(campus) // posición inicial de la cámara
 
   // Los manejadores se registran una sola vez; leen siempre lo más reciente.
-  const ultimo = useRef({ lugares, seleccionadoId, onSeleccionar, oscuro, ruta, limite })
+  const ultimo = useRef({
+    lugares,
+    seleccionadoId,
+    onSeleccionar,
+    oscuro,
+    ruta,
+    limite,
+    obtenerRelleno,
+  })
   useEffect(() => {
-    ultimo.current = { lugares, seleccionadoId, onSeleccionar, oscuro, ruta, limite }
+    ultimo.current = {
+      lugares,
+      seleccionadoId,
+      onSeleccionar,
+      oscuro,
+      ruta,
+      limite,
+      obtenerRelleno,
+    }
   })
 
   // El mapa se crea una sola vez; al cambiar de campus solo se mueve la cámara.
@@ -191,9 +225,10 @@ export function Mapa({
       attributionControl: false,
     })
     mapRef.current = map
-    // Arriba a la izquierda para que la hoja inferior nunca tape la atribución de OSM.
-    map.addControl(new AttributionControl({ compact: true }), 'top-left')
-    map.addControl(new NavigationControl({ showCompass: false }), 'top-right')
+    // Abajo a la derecha; en móvil el CSS los sube para que la hoja inferior
+    // nunca tape la atribución de OSM (ver --mapa-abajo en index.css).
+    map.addControl(new AttributionControl({ compact: true }), 'bottom-right')
+    map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right')
 
     // Se dispara en la carga inicial y cada vez que cambia el estilo (tema).
     map.on('style.load', () => {
@@ -211,7 +246,11 @@ export function Mapa({
       const fuente = map.getSource(FUENTE) as GeoJSONSource
       const zoom = await fuente.getClusterExpansionZoom(f.properties.cluster_id)
       const [lng, lat] = (f.geometry as { coordinates: number[] }).coordinates
-      map.easeTo({ center: [lng, lat], zoom })
+      map.easeTo({
+        center: [lng, lat],
+        zoom,
+        offset: centroLibre(ultimo.current.obtenerRelleno()),
+      })
     })
     map.on('click', (ev) => {
       const sobre = map.queryRenderedFeatures(ev.point, {
@@ -247,7 +286,10 @@ export function Mapa({
         [oeste, sur],
         [este, norte],
       ],
-      { padding: 24, duration: primera ? 0 : 1400 },
+      {
+        padding: conMargen(ultimo.current.obtenerRelleno(), 24),
+        duration: primera ? 0 : 1400,
+      },
     )
     const fijar = () =>
       // Holgura extra: con una caja ajustada, en pantallas verticales no se vería todo el campus.
@@ -282,7 +324,7 @@ export function Mapa({
     fuente?.setData(lugaresAGeoJSON(lugares) as never)
   }, [lugares])
 
-  // Lugar seleccionado: agranda su ícono, lo acerca y lo deja libre de la hoja inferior.
+  // Lugar seleccionado: agranda su ícono y lo centra en la parte del mapa que queda libre.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -292,15 +334,13 @@ export function Mapa({
       map.easeTo({
         center: [seleccionado.coordenadas[1], seleccionado.coordenadas[0]],
         zoom: Math.max(map.getZoom(), 16.5),
-        padding: { bottom: Math.round(map.getContainer().clientHeight * 0.4) },
+        offset: centroLibre(ultimo.current.obtenerRelleno()),
         duration: 500,
       })
-    } else {
-      map.easeTo({ padding: { bottom: 0 }, duration: 300 })
     }
   }, [seleccionado, seleccionadoId])
 
-  // Ruta: se actualiza la línea y se encuadra dejando libre la hoja inferior.
+  // Ruta: se actualiza la línea y se encuadra en la parte libre del mapa.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -313,12 +353,7 @@ export function Mapa({
       new LngLatBounds(linea.geometry.coordinates[0], linea.geometry.coordinates[0]),
     )
     map.fitBounds(caja, {
-      padding: {
-        top: 40,
-        left: 40,
-        right: 40,
-        bottom: Math.round(map.getContainer().clientHeight * 0.5),
-      },
+      padding: conMargen(ultimo.current.obtenerRelleno(), 48),
       maxZoom: 17,
       duration: 700,
     })
@@ -341,6 +376,7 @@ export function Mapa({
     map.easeTo({
       center: [ubicacion.lng, ubicacion.lat],
       zoom: Math.max(map.getZoom(), 17),
+      offset: centroLibre(ultimo.current.obtenerRelleno()),
       duration: 600,
     })
   }, [ubicacion, campus])

@@ -25,7 +25,7 @@ export function CompartirLugar({ lugar }: { lugar: Lugar }) {
 
   return (
     <div className="flex flex-col gap-1">
-      <Boton onClick={compartir} className="self-start">
+      <Boton onClick={compartir} className="w-full">
         Compartir enlace
       </Boton>
       <p role="status" className="text-small text-muted">

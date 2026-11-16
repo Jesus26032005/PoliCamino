@@ -37,9 +37,9 @@ function Seccion<T>({
   return (
     <section
       aria-label={titulo}
-      className="flex flex-col gap-2 rounded-control border border-border p-3"
+      className="flex flex-col gap-2 rounded-card border border-border bg-soft p-4"
     >
-      <h3 className="font-semibold">{titulo}</h3>
+      <h3 className="font-display font-semibold">{titulo}</h3>
       {estado.fase === 'cargando' && <p role="status">Cargando…</p>}
       {estado.fase === 'error' && (
         <div role="alert" className="flex flex-col items-start gap-2">
@@ -79,7 +79,7 @@ const Enlace = ({ href, children }: { href: string; children: ReactNode }) => (
 function VistaClima({ c }: { c: Clima }) {
   return (
     <>
-      <p className="text-title font-bold">
+      <p className="font-display text-title font-bold leading-tight">
         {Math.round(c.temperaturaC)} °C · {descripcionClima(c.codigo)}
       </p>
       <p className="text-small text-muted">
@@ -93,7 +93,7 @@ function VistaClima({ c }: { c: Clima }) {
 function VistaAire({ a }: { a: Aire }) {
   return (
     <>
-      <p className="text-title font-bold">
+      <p className="font-display text-title font-bold leading-tight">
         AQI {Math.round(a.usAqi)} · {categoriaAqi(a.usAqi)}
       </p>
       <p className="text-small text-muted">

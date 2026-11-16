@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import datos from '../data/zacatenco.lugares.json'
-import { buscar, crearIndice, filtrarPorCategorias, normalizar } from './busqueda'
+import {
+  buscar,
+  crearIndice,
+  filtrarPorCategorias,
+  normalizar,
+  ocultarCategorias,
+} from './busqueda'
 import { validarLugares } from './lugares'
 
 const lugares = validarLugares(datos)
@@ -62,5 +68,23 @@ describe('filtrarPorCategorias', () => {
     const r = filtrarPorCategorias(lugares, new Set(['biblioteca', 'cafeteria'] as const))
     expect(r.length).toBeGreaterThan(0)
     expect(r.every((l) => ['biblioteca', 'cafeteria'].includes(l.categoria))).toBe(true)
+  })
+})
+
+describe('ocultarCategorias', () => {
+  it('sin categorías apagadas devuelve todo', () => {
+    expect(ocultarCategorias(lugares, new Set())).toHaveLength(lugares.length)
+  })
+  it('quita solo las categorías apagadas', () => {
+    const r = ocultarCategorias(lugares, new Set(['transporte', 'acceso'] as const))
+    expect(r.length).toBeGreaterThan(0)
+    expect(r.length).toBeLessThan(lugares.length)
+    expect(r.some((l) => l.categoria === 'transporte' || l.categoria === 'acceso')).toBe(
+      false,
+    )
+  })
+  it('con todas apagadas no queda nada', () => {
+    const todas = new Set(lugares.map((l) => l.categoria))
+    expect(ocultarCategorias(lugares, todas)).toEqual([])
   })
 })

@@ -14,6 +14,8 @@ type Props = {
   valorInicial?: string
   /** La lista de resultados ocupa espacio en la página en vez de flotar encima. */
   enLinea?: boolean
+  /** Campo flotante sobre el mapa (barra superior en móvil). */
+  flotante?: boolean
 }
 
 /** Buscador con lista de resultados (patrón ARIA "combobox con listbox"). */
@@ -25,6 +27,7 @@ export function Buscador({
   placeholder = 'Buscar: ESCOM, biblioteca, cafetería…',
   valorInicial = '',
   enLinea = false,
+  flotante = false,
 }: Props) {
   const id = useId()
   const listaId = `${id}-lista`
@@ -86,13 +89,17 @@ export function Buscador({
         }}
         onFocus={() => setAbierto(true)}
         onKeyDown={alTeclear}
-        className="min-h-touch w-full rounded-control border border-border bg-surface px-4 text-body text-text placeholder:text-muted"
+        className={`w-full px-4 text-body text-text placeholder:text-muted ${
+          flotante
+            ? 'flotante h-control rounded-card'
+            : 'min-h-touch rounded-control border border-border-strong bg-soft'
+        }`}
       />
 
       {mostrar && (
         <div
           className={`mt-1 overflow-hidden rounded-control border border-border bg-surface ${
-            enLinea ? '' : 'absolute inset-x-0 top-full z-30 shadow-sheet'
+            enLinea ? '' : 'absolute inset-x-0 top-full z-30 shadow-flotante'
           }`}
         >
           <ul id={listaId} role="listbox" aria-label="Resultados">
