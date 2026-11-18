@@ -1,0 +1,7 @@
+{
+  // Sitio estático + funciones (functions/) en Cloudflare Pages.
+  // El Worker de ocupación es aparte: worker/wrangler.jsonc.
+  "name": "rutapoli",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2025-09-01"
+}

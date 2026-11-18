@@ -5,7 +5,7 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { opcionesPWA } from './pwa.config.ts'
 
-// El SSN solo ofrece HTTP y sin CORS: en desarrollo se reenvía igual que hace api/sismos.ts en producción.
+// El SSN solo ofrece HTTP y sin CORS: en desarrollo se reenvía igual que hace functions/api/sismos.ts en producción.
 const proxySismos = {
   '/api/sismos': {
     target: 'http://www.ssn.unam.mx',
@@ -25,7 +25,7 @@ export default defineConfig({
     include: [
       'src/**/*.test.ts',
       'scripts/**/*.test.ts',
-      'api/**/*.test.ts',
+      'functions/**/*.test.ts',
       'worker/**/*.test.ts',
     ],
   },

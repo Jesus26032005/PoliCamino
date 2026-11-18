@@ -1,0 +1,22 @@
+# Encabezados de Cloudflare Pages (https://developers.cloudflare.com/pages/configuration/headers/)
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  # Solo esta app puede pedir la ubicación; cámara y micrófono nunca.
+  Permissions-Policy: geolocation=(self), camera=(), microphone=()
+  X-Frame-Options: DENY
+  # Orígenes externos que usa la app: teselas (OpenFreeMap), clima y aire (Open-Meteo),
+  # rutas (OSRM de FOSSGIS) y el Worker de ocupación (*.workers.dev). Si el Worker usa
+  # otro dominio, agrégalo a connect-src.
+  Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://tiles.openfreemap.org https://api.open-meteo.com https://air-quality-api.open-meteo.com https://routing.openstreetmap.de https://*.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+
+# Archivos con hash en el nombre: nunca cambian.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# El service worker y el manifest deben revisarse en cada visita.
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache

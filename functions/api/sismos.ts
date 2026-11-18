@@ -5,8 +5,8 @@
  * y sin cabeceras CORS, así que una página HTTPS no puede leerlo directamente desde el navegador.
  * Esta función lo pide desde el servidor y lo entrega tal cual, en el mismo origen que la app.
  *
- * Formato Web estándar (`export default { fetch }`), compatible con Vercel Functions.
- * OJO: aún no se ha probado desplegada; se verifica en la Fase 7.
+ * Es una Pages Function de Cloudflare: el archivo functions/api/sismos.ts atiende /api/sismos.
+ * En desarrollo con `npm run dev` hace lo mismo el proxy de Vite (vite.config.ts).
  */
 const ORIGEN_SSN = 'http://www.ssn.unam.mx/rss/ultimos-sismos.xml'
 const MAX_BYTES = 200_000
@@ -38,6 +38,5 @@ export async function responderSismos(fetcher: typeof fetch = fetch): Promise<Re
   }
 }
 
-export default {
-  fetch: () => responderSismos(),
-}
+/** GET /api/sismos (Cloudflare Pages Functions). */
+export const onRequestGet = () => responderSismos()
