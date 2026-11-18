@@ -16,7 +16,7 @@ export default defineConfig({
   server: { proxy: proxySismos },
   preview: { proxy: proxySismos },
   plugins: [react(), tailwindcss()],
-  // MapLibre crea su worker con import.meta.url; el prebundle de Vite rompe esa ruta.
+  // MapLibre se excluye del prebundle; su worker se registra con setWorkerUrl (Mapa.tsx).
   optimizeDeps: { exclude: ['maplibre-gl'] },
   test: {
     environment: 'node',

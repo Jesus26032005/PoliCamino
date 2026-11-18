@@ -3,10 +3,14 @@ import {
   LngLatBounds,
   Map as MapaGL,
   Marker,
+  setWorkerUrl,
   NavigationControl,
   type GeoJSONSource,
 } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+// El worker de MapLibre se importa como URL para que Vite lo copie al build. Sin esto,
+// MapLibre lo busca junto a su propio módulo y en producción el mapa no carga.
+import urlWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { useEffect, useRef } from 'react'
 import { cajaDeGeometria, dentroDeLimites } from '../../lib/geo'
 import { lugaresAGeoJSON } from '../../lib/lugares'
@@ -15,6 +19,8 @@ import { leerToken, useTemaOscuro } from '../../lib/tema'
 import type { Campus, Lugar } from '../../lib/tipos'
 import type { Ubicacion } from '../ubicacion/useUbicacion'
 import { registrarIconos } from './iconos'
+
+setWorkerUrl(urlWorker)
 
 const ESTILO_CLARO = 'https://tiles.openfreemap.org/styles/positron'
 const ESTILO_OSCURO = 'https://tiles.openfreemap.org/styles/dark'
