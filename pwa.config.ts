@@ -4,11 +4,11 @@ import { APP_NAME } from './src/lib/config.ts'
 /**
  * PWA: instalable y usable sin conexión.
  *
- * - La app (HTML, JS, CSS, fuentes, íconos) y los datos de lugares y polígonos de cada
- *   campus van precacheados: son parte del build.
- * - Del mapa base solo se guardan las teselas que la persona ya vio, con tope de 1,500.
- *   OpenFreeMap permite uso offline si cada descarga es ≤ 3,000 teselas o 50 MB
- *   (https://openfreemap.org/tos/); aquí nunca se descargan áreas en bloque.
+ * - La app (HTML, JS, CSS, fuentes, íconos), los datos de lugares y polígonos de cada
+ *   campus y los glifos de etiquetas en español van precacheados: son parte del build.
+ * - El mapa base es un solo archivo PMTiles servido por el sitio (public/mapa). La app lo
+ *   lee y guarda su copia completa en la caché `mapa-base` por su cuenta
+ *   (src/features/mapa/mapaOffline.ts y fuenteMapa.ts): el service worker no interviene.
  * - Los datos en vivo (clima, aire, sismos, rutas, ocupación) NO se cachean aquí: si no
  *   hay red se muestra el error de cada sección. La app ya tiene su caché breve propia.
  */
@@ -54,9 +54,13 @@ export const opcionesPWA: Partial<VitePWAOptions> = {
     ],
   },
   workbox: {
-    globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2,txt}'],
+    globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2,txt}', 'glifos/*/0-255.pbf'],
     // Subconjuntos de fuentes que el español no usa (el navegador ni los pide).
-    globIgnores: ['**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
+    globIgnores: [
+      '**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2',
+      // El mapa base (~4.6 MB) se guarda aparte, con su propia lógica de rangos.
+      'mapa/**',
+    ],
     // El chunk del mapa (MapLibre) pesa ~1.1 MB sin comprimir.
     maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
     cleanupOutdatedCaches: true,
@@ -65,48 +69,14 @@ export const opcionesPWA: Partial<VitePWAOptions> = {
     navigateFallbackDenylist: [/^\/api\//],
     runtimeCaching: [
       {
-        // Estilos y descripción del juego de teselas.
-        urlPattern: ({ url }) =>
-          url.origin === 'https://tiles.openfreemap.org' &&
-          (url.pathname.startsWith('/styles/') || url.pathname === '/planet'),
-        handler: 'StaleWhileRevalidate',
-        options: {
-          cacheName: 'mapa-estilos',
-          expiration: { maxEntries: 20, maxAgeSeconds: 30 * DIA },
-          cacheableResponse: { statuses: [0, 200] },
-        },
-      },
-      {
-        // Teselas vectoriales que la persona ya vio.
-        urlPattern: ({ url }) =>
-          url.origin === 'https://tiles.openfreemap.org' &&
-          url.pathname.startsWith('/planet/') &&
-          url.pathname.endsWith('.pbf'),
+        // Glifos de otros rangos de caracteres (los de español ya van precacheados).
+        urlPattern: ({ url, sameOrigin }) =>
+          sameOrigin && url.pathname.startsWith('/glifos/'),
         handler: 'CacheFirst',
         options: {
-          cacheName: 'mapa-teselas',
-          expiration: {
-            maxEntries: 1500,
-            maxAgeSeconds: 30 * DIA,
-            purgeOnQuotaError: true,
-          },
-          cacheableResponse: { statuses: [0, 200] },
-        },
-      },
-      {
-        // Tipografías de etiquetas e íconos del estilo.
-        urlPattern: ({ url }) =>
-          url.origin === 'https://tiles.openfreemap.org' &&
-          (url.pathname.startsWith('/fonts/') || url.pathname.startsWith('/sprites/')),
-        handler: 'CacheFirst',
-        options: {
-          cacheName: 'mapa-recursos',
-          expiration: {
-            maxEntries: 200,
-            maxAgeSeconds: 60 * DIA,
-            purgeOnQuotaError: true,
-          },
-          cacheableResponse: { statuses: [0, 200] },
+          cacheName: 'mapa-glifos',
+          expiration: { maxEntries: 30, maxAgeSeconds: 60 * DIA },
+          cacheableResponse: { statuses: [200] },
         },
       },
     ],

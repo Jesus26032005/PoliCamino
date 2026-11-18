@@ -98,7 +98,14 @@ export type LugaresGeoJSON = {
     type: 'Feature'
     id: number
     geometry: { type: 'Point'; coordinates: [number, number] }
-    properties: { id: string; nombre: string; categoria: string; verificado: boolean }
+    properties: {
+      id: string
+      nombre: string
+      /** Texto corto para el mapa: la sigla si la hay (ESCOM), si no el nombre. */
+      etiqueta: string
+      categoria: string
+      verificado: boolean
+    }
   }[]
 }
 
@@ -113,6 +120,7 @@ export function lugaresAGeoJSON(lugares: Lugar[]): LugaresGeoJSON {
       properties: {
         id: l.id,
         nombre: l.nombre,
+        etiqueta: l.alias?.[0] ?? l.nombre,
         categoria: l.categoria,
         verificado: l.verificado,
       },

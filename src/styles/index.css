@@ -138,3 +138,15 @@
   border: 3px solid #ffffff;
   box-shadow: 0 0 0 5px color-mix(in srgb, var(--c-user) 30%, transparent);
 }
+
+/* Botón «3D» del mapa (control propio junto al zoom). */
+.maplibregl-ctrl button.control-3d {
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #15171c;
+}
+.maplibregl-ctrl button.control-3d[aria-pressed='true'] {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}

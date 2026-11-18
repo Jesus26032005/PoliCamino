@@ -1,16 +1,19 @@
 import {
+  addProtocol,
   AttributionControl,
   LngLatBounds,
   Map as MapaGL,
   Marker,
-  setWorkerUrl,
   NavigationControl,
+  setWorkerUrl,
   type GeoJSONSource,
+  type IControl,
 } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 // El worker de MapLibre se importa como URL para que Vite lo copie al build. Sin esto,
 // MapLibre lo busca junto a su propio módulo y en producción el mapa no carga.
 import urlWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
+import { PMTiles, Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
 import { cajaDeGeometria, dentroDeLimites } from '../../lib/geo'
 import { lugaresAGeoJSON } from '../../lib/lugares'
@@ -18,12 +21,24 @@ import { RUTA_VACIA, type RutaGeoJSON } from '../../lib/ruta'
 import { leerToken, useTemaOscuro } from '../../lib/tema'
 import type { Campus, Lugar } from '../../lib/tipos'
 import type { Ubicacion } from '../ubicacion/useUbicacion'
+import {
+  ALTURA_ESTIMADA_M,
+  CAPA_EDIFICIOS,
+  CAPA_EDIFICIOS_3D,
+  crearEstilo,
+} from './estilo'
 import { registrarIconos } from './iconos'
+import { fuenteMapa, guardarMapaOffline } from './mapaOffline'
 
 setWorkerUrl(urlWorker)
+// El mapa base es un archivo PMTiles: MapLibre lo lee con este protocolo (pmtiles://),
+// y los bytes salen de nuestra fuente (rangos, archivo completo o copia guardada).
+const protocolo = new Protocol()
+protocolo.add(new PMTiles(fuenteMapa))
+addProtocol('pmtiles', protocolo.tile)
 
-const ESTILO_CLARO = 'https://tiles.openfreemap.org/styles/positron'
-const ESTILO_OSCURO = 'https://tiles.openfreemap.org/styles/dark'
+const estiloPara = (oscuro: boolean, tresD: boolean) =>
+  crearEstilo({ oscuro, tresD, origen: window.location.origin })
 
 /** Grados extra alrededor de `campus.limites` en los que se puede navegar. */
 const HOLGURA = 0.02
@@ -31,6 +46,7 @@ const HOLGURA = 0.02
 const FUENTE = 'lugares'
 const RUTA = 'ruta'
 const LIMITE = 'campus-limite'
+const SELECCION = 'edificio-seleccionado'
 
 /** Polígono del campus en GeoJSON (Polygon o MultiPolygon). */
 export type LimiteCampus = {
@@ -38,7 +54,7 @@ export type LimiteCampus = {
   properties: Record<string, unknown>
   geometry: Parameters<typeof cajaDeGeometria>[0]
 }
-const SIN_LIMITE = { type: 'FeatureCollection', features: [] } as const
+const VACIO = { type: 'FeatureCollection', features: [] } as const
 
 type Props = {
   campus: Campus
@@ -73,22 +89,67 @@ const centroLibre = (r: Relleno): [number, number] => [
 const tamanoIcono = (seleccionadoId: string | null) =>
   ['case', ['==', ['get', 'id'], seleccionadoId ?? ''], 1.3, 1] as never
 
+/** Botón «3D» junto al zoom: inclina el mapa y levanta los edificios. */
+class Control3D implements IControl {
+  private contenedor = document.createElement('div')
+  private boton = document.createElement('button')
+  private alCambiar: (activo: boolean) => void
+
+  constructor(alCambiar: (activo: boolean) => void) {
+    this.alCambiar = alCambiar
+  }
+
+  onAdd() {
+    this.contenedor.className = 'maplibregl-ctrl maplibregl-ctrl-group'
+    this.boton.type = 'button'
+    this.boton.className = 'control-3d'
+    this.boton.textContent = '3D'
+    this.fijar(false)
+    this.boton.addEventListener('click', () => {
+      const activo = this.boton.getAttribute('aria-pressed') !== 'true'
+      this.fijar(activo)
+      this.alCambiar(activo)
+    })
+    this.contenedor.append(this.boton)
+    return this.contenedor
+  }
+
+  onRemove() {
+    this.contenedor.remove()
+  }
+
+  fijar(activo: boolean) {
+    this.boton.setAttribute('aria-pressed', String(activo))
+    const texto = activo ? 'Volver a la vista 2D' : 'Ver edificios en 3D'
+    this.boton.setAttribute('aria-label', texto)
+    this.boton.title = texto
+  }
+}
+
 function instalarCapas(
   map: MapaGL,
   lugares: Lugar[],
   seleccionadoId: string | null,
   ruta: RutaGeoJSON,
   limite: LimiteCampus | null,
+  tresD: boolean,
+  oscuro: boolean,
 ) {
   registrarIconos(map)
   const primario = leerToken('--c-primary')
+  const tinta = leerToken('--c-ink')
+  const sobreTinta = leerToken('--c-on-ink')
+  const superficie = leerToken('--c-surface')
+  const texto = leerToken('--c-text')
+  const colorRuta = leerToken('--c-route')
 
-  map.addSource(LIMITE, { type: 'geojson', data: (limite ?? SIN_LIMITE) as never })
+  // Polígono del campus.
+  map.addSource(LIMITE, { type: 'geojson', data: (limite ?? VACIO) as never })
   map.addLayer({
     id: `${LIMITE}-relleno`,
     type: 'fill',
     source: LIMITE,
-    paint: { 'fill-color': primario, 'fill-opacity': 0.06 },
+    paint: { 'fill-color': primario, 'fill-opacity': oscuro ? 0.035 : 0.06 },
   })
   map.addLayer({
     id: `${LIMITE}-linea`,
@@ -97,11 +158,43 @@ function instalarCapas(
     paint: { 'line-color': primario, 'line-width': 2, 'line-dasharray': [3, 2] },
   })
 
+  // Edificio del lugar elegido (contorno en 2D, volumen en 3D).
+  map.addSource(SELECCION, { type: 'geojson', data: VACIO as never })
+  map.addLayer({
+    id: `${SELECCION}-relleno`,
+    type: 'fill',
+    source: SELECCION,
+    paint: { 'fill-color': primario, 'fill-opacity': 0.25 },
+  })
+  map.addLayer({
+    id: `${SELECCION}-linea`,
+    type: 'line',
+    source: SELECCION,
+    paint: { 'line-color': primario, 'line-width': 2.5 },
+  })
+  map.addLayer({
+    id: `${SELECCION}-3d`,
+    type: 'fill-extrusion',
+    source: SELECCION,
+    layout: { visibility: tresD ? 'visible' : 'none' },
+    paint: {
+      'fill-extrusion-color': primario,
+      'fill-extrusion-height': [
+        '+',
+        ['coalesce', ['get', 'height'], ALTURA_ESTIMADA_M],
+        0.5,
+      ],
+      'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0],
+      'fill-extrusion-opacity': 0.85,
+    },
+  })
+
+  // Lugares: grupos (clusters) discretos que se separan al acercarse.
   map.addSource(FUENTE, {
     type: 'geojson',
     data: lugaresAGeoJSON(lugares) as never,
     cluster: true,
-    clusterRadius: 44,
+    clusterRadius: 36,
     clusterMaxZoom: 15,
   })
   map.addLayer({
@@ -110,10 +203,11 @@ function instalarCapas(
     source: FUENTE,
     filter: ['has', 'point_count'],
     paint: {
-      'circle-color': primario,
-      'circle-radius': ['step', ['get', 'point_count'], 18, 10, 22, 30, 26],
-      'circle-stroke-width': 3,
-      'circle-stroke-color': '#ffffff',
+      'circle-color': tinta,
+      'circle-opacity': 0.88,
+      'circle-radius': ['step', ['get', 'point_count'], 14, 10, 17, 30, 20],
+      'circle-stroke-width': 2,
+      'circle-stroke-color': superficie,
     },
   })
   map.addLayer({
@@ -123,11 +217,44 @@ function instalarCapas(
     filter: ['has', 'point_count'],
     layout: {
       'text-field': ['get', 'point_count_abbreviated'],
-      'text-font': ['Noto Sans Bold'],
-      'text-size': 14,
+      'text-font': ['Noto Sans Medium'],
+      'text-size': 12,
+      'text-allow-overlap': true,
     },
-    paint: { 'text-color': leerToken('--c-on-primary') },
+    paint: { 'text-color': sobreTinta },
   })
+
+  // Ruta a pie: por encima de los grupos y debajo de los íconos de lugares.
+  map.addSource(RUTA, { type: 'geojson', data: ruta as never })
+  map.addLayer({
+    id: 'ruta-borde',
+    type: 'line',
+    source: RUTA,
+    filter: ['==', ['get', 'rol'], 'ruta'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#ffffff', 'line-width': 9 },
+  })
+  map.addLayer({
+    id: 'ruta-linea',
+    type: 'line',
+    source: RUTA,
+    filter: ['==', ['get', 'rol'], 'ruta'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': colorRuta, 'line-width': 5 },
+  })
+  map.addLayer({
+    id: 'ruta-puntos',
+    type: 'circle',
+    source: RUTA,
+    filter: ['!=', ['get', 'rol'], 'ruta'],
+    paint: {
+      'circle-radius': 8,
+      'circle-color': ['case', ['==', ['get', 'rol'], 'destino'], colorRuta, '#ffffff'],
+      'circle-stroke-color': colorRuta,
+      'circle-stroke-width': 4,
+    },
+  })
+
   map.addLayer({
     id: 'lugares-puntos',
     type: 'symbol',
@@ -139,47 +266,24 @@ function instalarCapas(
       'icon-allow-overlap': true,
     },
   })
-
-  // Ruta a pie: debajo de los íconos de lugares, por encima del mapa base.
-  const colorRuta = leerToken('--c-route')
-  map.addSource(RUTA, { type: 'geojson', data: ruta as never })
-  map.addLayer(
-    {
-      id: 'ruta-borde',
-      type: 'line',
-      source: RUTA,
-      filter: ['==', ['get', 'rol'], 'ruta'],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#ffffff', 'line-width': 9 },
+  // Nombres (o siglas) bajo los íconos al acercarse; se ocultan si chocan entre sí.
+  map.addLayer({
+    id: 'lugares-nombres',
+    type: 'symbol',
+    source: FUENTE,
+    filter: ['!', ['has', 'point_count']],
+    minzoom: 16,
+    layout: {
+      'text-field': ['get', 'etiqueta'],
+      'text-font': ['Noto Sans Medium'],
+      'text-size': 12,
+      'text-anchor': 'top',
+      'text-offset': [0, 1.5],
+      'text-max-width': 9,
+      'text-optional': true,
     },
-    'clusters',
-  )
-  map.addLayer(
-    {
-      id: 'ruta-linea',
-      type: 'line',
-      source: RUTA,
-      filter: ['==', ['get', 'rol'], 'ruta'],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': colorRuta, 'line-width': 5 },
-    },
-    'clusters',
-  )
-  map.addLayer(
-    {
-      id: 'ruta-puntos',
-      type: 'circle',
-      source: RUTA,
-      filter: ['!=', ['get', 'rol'], 'ruta'],
-      paint: {
-        'circle-radius': 8,
-        'circle-color': ['case', ['==', ['get', 'rol'], 'destino'], colorRuta, '#ffffff'],
-        'circle-stroke-color': colorRuta,
-        'circle-stroke-width': 4,
-      },
-    },
-    'clusters',
-  )
+    paint: { 'text-color': texto, 'text-halo-color': superficie, 'text-halo-width': 1.6 },
+  })
 }
 
 export function Mapa({
@@ -197,6 +301,9 @@ export function Mapa({
   const mapRef = useRef<MapaGL | null>(null)
   const oscuro = useTemaOscuro()
   const campus0 = useRef(campus) // posición inicial de la cámara
+  const tresD = useRef(false)
+  // Campus ya encuadrado en el mapa actual (se reinicia si el mapa se vuelve a crear).
+  const encuadrado = useRef<string | null>(null)
 
   // Los manejadores se registran una sola vez; leen siempre lo más reciente.
   const ultimo = useRef({
@@ -224,23 +331,58 @@ export function Mapa({
   useEffect(() => {
     const map = new MapaGL({
       container: contenedor.current!,
-      style: ultimo.current.oscuro ? ESTILO_OSCURO : ESTILO_CLARO,
+      style: estiloPara(ultimo.current.oscuro, false),
       center: [campus0.current.centro[1], campus0.current.centro[0]],
       zoom: campus0.current.zoom,
       minZoom: 13,
+      maxPitch: 60,
+      // Rendimiento en celulares: pantallas de 3× se dibujan a 2× (casi no se nota y
+      // ahorra mucha GPU) y sin animación de aparición de teselas y etiquetas.
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      fadeDuration: 0,
       attributionControl: false,
     })
     mapRef.current = map
+    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__mapa = map // pruebas
     // Abajo a la derecha; en móvil el CSS los sube para que la hoja inferior
     // nunca tape la atribución de OSM (ver --mapa-abajo en index.css).
     map.addControl(new AttributionControl({ compact: true }), 'bottom-right')
-    map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right')
+    map.addControl(
+      new NavigationControl({ showCompass: true, visualizePitch: true }),
+      'bottom-right',
+    )
+    map.addControl(
+      new Control3D((activo) => {
+        tresD.current = activo
+        for (const id of [CAPA_EDIFICIOS_3D, `${SELECCION}-3d`])
+          if (map.getLayer(id))
+            map.setLayoutProperty(id, 'visibility', activo ? 'visible' : 'none')
+        map.easeTo({
+          pitch: activo ? 55 : 0,
+          bearing: activo ? -17 : 0,
+          zoom: activo ? Math.max(map.getZoom(), 16) : map.getZoom(),
+          duration: 900,
+        })
+      }),
+      'bottom-right',
+    )
 
     // Se dispara en la carga inicial y cada vez que cambia el estilo (tema).
     map.on('style.load', () => {
       const u = ultimo.current
-      instalarCapas(map, u.lugares, u.seleccionadoId, u.ruta ?? RUTA_VACIA, u.limite)
+      instalarCapas(
+        map,
+        u.lugares,
+        u.seleccionadoId,
+        u.ruta ?? RUTA_VACIA,
+        u.limite,
+        tresD.current,
+        u.oscuro,
+      )
     })
+
+    // Con el mapa ya visible, se guarda una copia para usarlo sin conexión.
+    map.once('idle', () => window.setTimeout(() => void guardarMapaOffline(), 2500))
 
     map.on('click', 'lugares-puntos', (ev) => {
       const id = ev.features?.[0]?.properties?.id as string | undefined
@@ -272,11 +414,11 @@ export function Mapa({
     return () => {
       map.remove()
       mapRef.current = null
+      encuadrado.current = null
     }
   }, [])
 
   // Encuadre y límites de navegación del campus actual (también al cambiar de campus).
-  const encuadrado = useRef<string | null>(null)
   useEffect(() => {
     const map = mapRef.current
     if (!map || !limite) return
@@ -310,17 +452,17 @@ export function Mapa({
   // El polígono dibujado sigue al campus.
   useEffect(() => {
     const fuente = mapRef.current?.getSource(LIMITE) as GeoJSONSource | undefined
-    fuente?.setData((limite ?? SIN_LIMITE) as never)
+    fuente?.setData((limite ?? VACIO) as never)
   }, [limite])
 
-  // Cambio de tema: otro estilo base; las capas se reinstalan en 'style.load'.
+  // Cambio de tema: otro estilo base; las capas propias se reinstalan en 'style.load'.
   const primeraVez = useRef(true)
   useEffect(() => {
     if (primeraVez.current) {
       primeraVez.current = false
       return
     }
-    mapRef.current?.setStyle(oscuro ? ESTILO_OSCURO : ESTILO_CLARO)
+    mapRef.current?.setStyle(estiloPara(oscuro, tresD.current), { diff: false })
   }, [oscuro])
 
   // Filtros: al cambiar los lugares visibles se actualiza la fuente del mapa.
@@ -330,19 +472,48 @@ export function Mapa({
     fuente?.setData(lugaresAGeoJSON(lugares) as never)
   }, [lugares])
 
-  // Lugar seleccionado: agranda su ícono y lo centra en la parte del mapa que queda libre.
+  // Lugar seleccionado: agranda su ícono, lo centra en la zona libre y resalta su edificio.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
     if (map.getLayer('lugares-puntos'))
       map.setLayoutProperty('lugares-puntos', 'icon-size', tamanoIcono(seleccionadoId))
-    if (seleccionado) {
-      map.easeTo({
-        center: [seleccionado.coordenadas[1], seleccionado.coordenadas[0]],
-        zoom: Math.max(map.getZoom(), 16.5),
-        offset: centroLibre(ultimo.current.obtenerRelleno()),
-        duration: 500,
-      })
+    const fuenteSel = () => map.getSource(SELECCION) as GeoJSONSource | undefined
+    fuenteSel()?.setData(VACIO as never)
+    if (!seleccionado) return
+
+    const [lat, lng] = seleccionado.coordenadas
+    map.easeTo({
+      center: [lng, lat],
+      zoom: Math.max(map.getZoom(), 16.5),
+      offset: centroLibre(ultimo.current.obtenerRelleno()),
+      duration: 500,
+    })
+    // Cuando terminan la animación y la carga, se busca el edificio bajo el lugar.
+    const resaltar = () => {
+      if (ultimo.current.seleccionadoId !== seleccionado.id) return
+      const capas = [CAPA_EDIFICIOS, CAPA_EDIFICIOS_3D].filter(
+        (id) => map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== 'none',
+      )
+      const edificio = map
+        .queryRenderedFeatures(map.project([lng, lat]), { layers: capas })
+        .find((f) => f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')
+      fuenteSel()?.setData(
+        (edificio
+          ? {
+              type: 'Feature',
+              properties: {
+                height: edificio.properties?.height,
+                min_height: edificio.properties?.min_height,
+              },
+              geometry: edificio.geometry,
+            }
+          : VACIO) as never,
+      )
+    }
+    map.once('idle', resaltar)
+    return () => {
+      map.off('idle', resaltar)
     }
   }, [seleccionado, seleccionadoId])
 

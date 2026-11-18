@@ -27,3 +27,6 @@ dist-ssr
 .wrangler
 .dev.vars
 worker/.dev.vars
+
+# Entorno de Python para scripts/extraer_mapa.py
+.venv-mapa

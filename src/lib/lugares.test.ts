@@ -45,6 +45,11 @@ describe('lugaresAGeoJSON', () => {
     const g = lugaresAGeoJSON([base])
     expect(g.features[0].geometry.coordinates).toEqual([-99.14, 19.5])
   })
+  it('la etiqueta del mapa usa la sigla si existe', () => {
+    expect(lugaresAGeoJSON([base]).features[0].properties.etiqueta).toBe('Prueba')
+    const conSigla = { ...base, alias: ['ESCOM'] }
+    expect(lugaresAGeoJSON([conSigla]).features[0].properties.etiqueta).toBe('ESCOM')
+  })
 })
 
 describe.each(CAMPUS_LISTA)('datos de $nombre', (campus) => {

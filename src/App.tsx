@@ -15,6 +15,11 @@ import { AvisosPWA } from './features/pwa/AvisosPWA'
 import { DetalleLugar } from './features/lugares/DetalleLugar'
 import type { Relleno } from './features/mapa/Mapa'
 import {
+  BYTES_MAPA,
+  useEstadoMapaOffline,
+  type EstadoMapaOffline,
+} from './features/mapa/mapaOffline'
+import {
   PanelRuta,
   type Origen,
   type Pestana as PestanaRuta,
@@ -46,6 +51,17 @@ const SIN_LUGARES: Lugar[] = []
 
 // MapLibre pesa ~1 MB: se carga aparte para que la interfaz se pinte antes que el mapa.
 const Mapa = lazy(() => import('./features/mapa/Mapa').then((m) => ({ default: m.Mapa })))
+
+const MB_MAPA = (BYTES_MAPA / 1_048_576).toFixed(1)
+const TEXTO_MAPA_OFFLINE: Record<EstadoMapaOffline, string> = {
+  'sin-soporte': '',
+  pendiente: '',
+  guardando: 'Guardando el mapa para usarlo sin conexión…',
+  guardado: `Mapa guardado para usarlo sin conexión (${MB_MAPA} MB).`,
+  ahorro:
+    'Tienes activado el ahorro de datos: el mapa no se guardó para usarlo sin conexión.',
+  error: 'No se pudo guardar el mapa para usarlo sin conexión.',
+}
 
 const PESTANAS = [
   { id: 'lugares', etiqueta: 'Lugares' },
@@ -102,6 +118,7 @@ export default function App() {
   const ubic = useUbicacion()
   const enVivo = useEnVivo(campus.centro)
   const escritorio = useEsEscritorio()
+  const mapaOffline = useEstadoMapaOffline()
 
   // Panel: pestaña activa y altura de la hoja inferior (solo móvil).
   const [pestana, setPestana] = useState<PestanaPanel>('lugares')
@@ -555,6 +572,11 @@ export default function App() {
               <p className="mt-auto border-t border-border pt-3 text-mini leading-relaxed text-muted">
                 {DISCLAIMER_TEXT} Lugares tomados de OpenStreetMap, sin verificar en
                 campo.
+                {TEXTO_MAPA_OFFLINE[mapaOffline] && (
+                  <span role="status" className="mt-1 block">
+                    {TEXTO_MAPA_OFFLINE[mapaOffline]}
+                  </span>
+                )}
               </p>
             </>
           ))}

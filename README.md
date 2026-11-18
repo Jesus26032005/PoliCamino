@@ -42,6 +42,8 @@ npm run pages:dev    # build + emulación local de Cloudflare Pages (http://loca
 - `functions/api/sismos.ts`: proxy del SSN (Cloudflare Pages Function).
 - `worker/`: Worker de ocupación (Cloudflare Workers + D1), se despliega aparte.
 - `pwa.config.ts`: manifest y estrategia de caché offline.
+- `public/mapa/` y `public/glifos/`: mapa base (PMTiles) y tipografías de sus etiquetas.
+- `scripts/extraer_mapa.py`: recorta el mapa base de Protomaps a la zona de los campus.
 
 ## Publicar (Cloudflare Pages)
 
@@ -63,48 +65,59 @@ Alternativa: conectar el repositorio de GitHub en el panel de Cloudflare Pages
 
 - **Instalable**: manifest con nombre, íconos propios (incluido uno _maskable_) y service worker.
   Chrome no reporta errores de instalabilidad.
-- **Sin conexión** (verificado en Chrome con la red cortada): abre la app, el mapa base ya visitado, los
-  lugares y polígonos de **ambos** campus, la búsqueda y los enlaces compartidos. Aparece un aviso
-  «Sin conexión». Las rutas y los datos en vivo necesitan red y lo dicen.
-- **Qué se guarda**: la app y los datos de lugares se precachean (~2.2 MB). Del mapa base solo las teselas
-  que ya viste (máx. 1,500, 30 días), dentro de los
-  [términos de OpenFreeMap](https://openfreemap.org/tos/) para uso offline. Nunca se descargan áreas en bloque.
+- **Sin conexión** (verificado en Chrome con la red cortada, sobre la emulación de Cloudflare): abre la
+  app, el mapa base **completo** de ambos campus (calles, edificios y etiquetas), los lugares, la búsqueda
+  y los enlaces compartidos. Aparece un aviso «Sin conexión». Las rutas y los datos en vivo necesitan red y
+  lo dicen.
+- **Qué se guarda**: la app, los lugares y las tipografías del mapa se precachean (~2.5 MB). El mapa base
+  (un PMTiles de 4.6 MB) se guarda aparte la primera vez que se ve el mapa, salvo con ahorro de datos
+  activado; el panel lo indica («Mapa guardado para usarlo sin conexión»).
 - **Actualizaciones**: cuando hay una versión nueva, la app pregunta antes de recargar.
 
 ## Calidad
 
-- 129 pruebas (Vitest): búsqueda con los datos reales, validación y carga de datos de todos los campus,
-  importador de OSM, geometría, rutas, datos en vivo con respuestas reales guardadas, caché, ocupación
+- 147 pruebas (Vitest): búsqueda con los datos reales, validación y carga de datos de todos los campus,
+  importador de OSM, geometría, estilo y fuente del mapa base, rutas, datos en vivo con respuestas reales guardadas, caché, ocupación
   (reglas y Worker) y proxy del SSN.
-- Lighthouse 12 sobre el build de producción (servidor local; en móvil, mediana de 3 corridas):
+- Lighthouse 12 sobre el build de producción servido con la emulación local de Cloudflare Pages
+  (`npm run pages:dev`; en móvil, mediana de 3 corridas):
 
 | Categoría                | Móvil | PC     |
 | ------------------------ | ----- | ------ |
-| Rendimiento              | 60    | 97     |
+| Rendimiento              | 62    | 94     |
 | Accesibilidad            | 100   | 100    |
-| Buenas prácticas         | 100   | 100    |
+| Buenas prácticas         | 100   | 96\*   |
 | SEO                      | 100   | 100    |
-| First Contentful Paint   | 2.8 s | 0.6 s  |
-| Largest Contentful Paint | 4.1 s | 0.8 s  |
-| Total Blocking Time      | 1.0 s | 0.13 s |
-| Cumulative Layout Shift  | 0.05  | 0.01   |
+| First Contentful Paint   | 2.6 s | 0.6 s  |
+| Largest Contentful Paint | 3.7 s | 0.8 s  |
+| Total Blocking Time      | 1.3 s | 0.18 s |
+| Cumulative Layout Shift  | 0.02  | 0.01   |
+
+\*En esa corrida el SSN no respondió y el proxy devolvió 502, que el navegador registra en consola.
 
 El rendimiento en móvil lo limita MapLibre (dibujo WebGL con la CPU 4× más lenta que simula Lighthouse).
-Como referencia, el mapa de travesiaunam.com, con el mismo tipo de mapa, obtiene 55 en la misma prueba.
-El mapa se carga aparte del resto para que la interfaz aparezca antes (bundle inicial: 87 KB gzip).
+Como referencia, el mapa de travesiaunam.com obtiene 55 en la misma prueba. El mapa se carga aparte del resto
+para que la interfaz aparezca antes (bundle inicial: 97 KB gzip).
+
+**Peso de la primera visita.** Cloudflare Pages no responde rangos, así que la primera vez se descarga el
+mapa base completo (4.6 MB) y luego queda guardado para siempre y sin conexión. Si se sirve el PMTiles desde
+un lugar con rangos (por ejemplo un bucket de Cloudflare R2), la app lo detecta sola y pide solo las
+teselas que ve (unos cientos de KB al abrir).
 
 ## Datos, fuentes y licencias
 
-| Qué                                                    | Fuente                                                                         | Licencia / condiciones                                                                                                                        |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lugares, polígonos de campus, accesos, Metro y paradas | © colaboradores de [OpenStreetMap](https://www.openstreetmap.org/copyright)    | [ODbL 1.0](https://opendatacommons.org/licenses/odbl/). `src/data/*.lugares.json` y `*.limite.json` son una base de datos derivada bajo ODbL. |
-| Mapa base (teselas vectoriales, estilos)               | [OpenFreeMap](https://openfreemap.org) con esquema OpenMapTiles                | MIT; atribución «OpenFreeMap © OpenMapTiles Data from OpenStreetMap», visible siempre en el mapa.                                             |
-| Rutas a pie                                            | OSRM del servidor de [FOSSGIS](https://routing.openstreetmap.de/about.html)    | Máx. 1 petición/s, sin uso masivo, atribución y enlace «Corregir el mapa». Las coordenadas se envían a ese servidor.                          |
-| Clima                                                  | [Open-Meteo](https://open-meteo.com/)                                          | CC BY 4.0, solo uso no comercial en el plan gratuito.                                                                                         |
-| Calidad del aire                                       | Open-Meteo con datos de CAMS ([Copernicus](https://atmosphere.copernicus.eu/)) | CC BY 4.0. Contiene información modificada del Servicio de Monitoreo Atmosférico de Copernicus. Es un modelo, no una estación.                |
-| Sismos                                                 | [Servicio Sismológico Nacional](http://www.ssn.unam.mx/), UNAM (RSS público)   | Se cita la fuente y se enlaza. Antes de un uso más amplio, revisa las condiciones del SSN.                                                    |
-| Tipografías                                            | Inter y Space Grotesk (vía Fontsource)                                         | SIL Open Font License 1.1.                                                                                                                    |
-| Mapa interactivo                                       | [MapLibre GL JS](https://maplibre.org/)                                        | BSD-3-Clause.                                                                                                                                 |
+| Qué                                                     | Fuente                                                                                                     | Licencia / condiciones                                                                                                                                                     |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lugares, polígonos de campus, accesos, Metro y paradas  | © colaboradores de [OpenStreetMap](https://www.openstreetmap.org/copyright)                                | [ODbL 1.0](https://opendatacommons.org/licenses/odbl/). `src/data/*.lugares.json` y `*.limite.json` son una base de datos derivada bajo ODbL.                              |
+| Mapa base (`public/mapa/ipn.pmtiles`)                   | Recorte del basemap de [Protomaps](https://docs.protomaps.com/basemaps/downloads) (datos de OpenStreetMap) | ODbL 1.0 (obra producida); atribución «Protomaps © OpenStreetMap», visible siempre en el mapa. Protomaps pide no enlazar sus builds: el recorte se sirve desde este sitio. |
+| Estilo del mapa                                         | `@protomaps/basemaps` con colores propios (`src/features/mapa/estilo.ts`) y lector `pmtiles`               | BSD-3-Clause (ambos paquetes).                                                                                                                                             |
+| Tipografías de las etiquetas del mapa (`public/glifos`) | Noto Sans (glifos de [basemaps-assets](https://github.com/protomaps/basemaps-assets))                      | SIL Open Font License 1.1 (`public/glifos/OFL.txt`).                                                                                                                       |
+| Rutas a pie                                             | OSRM del servidor de [FOSSGIS](https://routing.openstreetmap.de/about.html)                                | Máx. 1 petición/s, sin uso masivo, atribución y enlace «Corregir el mapa». Las coordenadas se envían a ese servidor.                                                       |
+| Clima                                                   | [Open-Meteo](https://open-meteo.com/)                                                                      | CC BY 4.0, solo uso no comercial en el plan gratuito.                                                                                                                      |
+| Calidad del aire                                        | Open-Meteo con datos de CAMS ([Copernicus](https://atmosphere.copernicus.eu/))                             | CC BY 4.0. Contiene información modificada del Servicio de Monitoreo Atmosférico de Copernicus. Es un modelo, no una estación.                                             |
+| Sismos                                                  | [Servicio Sismológico Nacional](http://www.ssn.unam.mx/), UNAM (RSS público)                               | Se cita la fuente y se enlaza. Antes de un uso más amplio, revisa las condiciones del SSN.                                                                                 |
+| Tipografías                                             | Inter y Space Grotesk (vía Fontsource)                                                                     | SIL Open Font License 1.1.                                                                                                                                                 |
+| Mapa interactivo                                        | [MapLibre GL JS](https://maplibre.org/)                                                                    | BSD-3-Clause.                                                                                                                                                              |
 
 **Licencia del código:** pendiente de elegir por quien mantiene el proyecto (sugerencia: MIT). Hasta que
 haya un archivo `LICENSE`, el código no tiene licencia de reutilización.
@@ -116,6 +129,32 @@ haya un archivo `LICENSE`, el código no tiene licencia de reutilización.
 `npm run importar:osm -- <campus>` consulta Overpass y regenera `src/data/<campus>.lugares.json` y
 `.limite.json`. Todo lo importado entra con `verificado: false`. Reimportar sobrescribe esos dos archivos
 (nunca `servicios.json`): si corriges algo a mano, mejor corrígelo en OpenStreetMap.
+
+### Mapa base
+
+- **Un solo archivo** `public/mapa/ipn.pmtiles` (4.6 MB, zooms 12–15) con la zona navegable de los dos
+  campus, servido por el propio sitio: sin servidores de mapas externos ni claves.
+- **Regenerarlo** (por ejemplo, cuando OSM tenga cambios o al agregar un campus; ampliar antes la caja en el
+  script):
+
+  ```bash
+  python3 -m venv .venv-mapa && .venv-mapa/bin/pip install pmtiles
+  .venv-mapa/bin/python scripts/extraer_mapa.py        # usa el build diario más reciente de Protomaps
+  ```
+
+  Solo descarga los bytes necesarios del planeta (peticiones por rangos). Actualiza
+  `src/data/mapa-base.json`, cuya versión cambia la URL del mapa y renueva las copias guardadas.
+
+- **Rangos y Cloudflare Pages**: Pages hoy responde el archivo completo a las peticiones por rango
+  ([documentación](https://developers.cloudflare.com/pages/configuration/serving-pages/)). Por eso
+  `fuenteMapa.ts` decide con la primera respuesta: si el servidor da rangos (206), pide solo trozos; si da el
+  archivo (200), lo baja **una vez** y recorta en memoria; si hay copia guardada, no usa la red.
+- **Estilo propio** claro y oscuro (calles legibles, campus teñidos, sin POIs del mapa base que estorben a
+  los marcadores). Nombres o siglas bajo los marcadores desde el zoom 16; grupos discretos que se separan
+  al acercarse; el edificio del lugar elegido se resalta.
+- **Vista 3D** (botón «3D»): edificios con la altura de OSM. **Solo ~1 de cada 8 edificios trae altura**;
+  al resto se le pone una estimada de 9 m (unos 3 pisos), así que el 3D es orientativo.
+- **Rendimiento**: en pantallas de alta densidad se dibuja a 2× como máximo y sin animaciones de aparición.
 
 ### Cómo llegar
 
