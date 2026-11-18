@@ -2,6 +2,8 @@
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
+import { VitePWA } from 'vite-plugin-pwa'
+import { opcionesPWA } from './pwa.config.ts'
 
 // El SSN solo ofrece HTTP y sin CORS: en desarrollo se reenvía igual que hace api/sismos.ts en producción.
 const proxySismos = {
@@ -15,7 +17,7 @@ const proxySismos = {
 export default defineConfig({
   server: { proxy: proxySismos },
   preview: { proxy: proxySismos },
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), VitePWA(opcionesPWA)],
   // MapLibre se excluye del prebundle; su worker se registra con setWorkerUrl (Mapa.tsx).
   optimizeDeps: { exclude: ['maplibre-gl'] },
   test: {

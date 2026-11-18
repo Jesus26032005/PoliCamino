@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Boton } from './components/Boton'
 import { Buscador } from './components/Buscador'
 import { ChipFiltro } from './components/ChipFiltro'
@@ -11,8 +11,9 @@ import { SelectorCampus } from './components/SelectorCampus'
 import { CAMPUS, CAMPUS_INICIAL, CAMPUS_LISTA, esCampusId } from './data/campus'
 import { TarjetaHoy } from './features/envivo/TarjetaHoy'
 import { useEnVivo } from './features/envivo/useEnVivo'
+import { AvisosPWA } from './features/pwa/AvisosPWA'
 import { DetalleLugar } from './features/lugares/DetalleLugar'
-import { Mapa, type Relleno } from './features/mapa/Mapa'
+import type { Relleno } from './features/mapa/Mapa'
 import {
   PanelRuta,
   type Origen,
@@ -42,6 +43,9 @@ type Carga =
   | { campusId: CampusId; fase: 'error'; mensaje: string }
 
 const SIN_LUGARES: Lugar[] = []
+
+// MapLibre pesa ~1 MB: se carga aparte para que la interfaz se pinte antes que el mapa.
+const Mapa = lazy(() => import('./features/mapa/Mapa').then((m) => ({ default: m.Mapa })))
 
 const PESTANAS = [
   { id: 'lugares', etiqueta: 'Lugares' },
@@ -320,16 +324,24 @@ export default function App() {
   return (
     <div className="app relative h-full overflow-hidden" data-hoja={hoja}>
       <main className="absolute inset-0">
-        <Mapa
-          campus={campus}
-          limite={limite}
-          lugares={visibles}
-          seleccionado={seleccionado}
-          onSeleccionar={alSeleccionarEnMapa}
-          ubicacion={ubic.ubicacion}
-          ruta={rutaGeo}
-          obtenerRelleno={obtenerRelleno}
-        />
+        <Suspense
+          fallback={
+            <p role="status" className="sr-only">
+              Cargando mapa…
+            </p>
+          }
+        >
+          <Mapa
+            campus={campus}
+            limite={limite}
+            lugares={visibles}
+            seleccionado={seleccionado}
+            onSeleccionar={alSeleccionarEnMapa}
+            ubicacion={ubic.ubicacion}
+            ruta={rutaGeo}
+            obtenerRelleno={obtenerRelleno}
+          />
+        </Suspense>
       </main>
 
       {/* Barra superior flotante */}
@@ -379,19 +391,17 @@ export default function App() {
             setPestana('hoy')
             setHoja('max')
           }}
-          aria-label={
-            clima
-              ? `Hoy en el campus: ${Math.round(clima.temperaturaC)} grados, ${descripcionClima(clima.codigo)}`
-              : 'Hoy en el campus'
-          }
           className="h-control shrink-0 rounded-card px-3 desk:px-4"
         >
           <span className="hidden desk:inline-flex">
             <Icono nombre="nube" tam={20} />
           </span>
+          {/* El nombre accesible incluye el texto visible (control por voz: «pulsa 15°»). */}
+          <span className="sr-only">Hoy en el campus:</span>
           <span className="font-display text-body font-semibold">
             {clima ? `${Math.round(clima.temperaturaC)}°` : 'Hoy'}
           </span>
+          {clima && <span className="sr-only">, {descripcionClima(clima.codigo)}</span>}
           {aire && (
             <span
               title={`Calidad del aire: ${categoriaAqi(aire.usAqi)}`}
@@ -415,6 +425,7 @@ export default function App() {
 
       {/* Avisos y resumen de ruta, sobre el mapa */}
       <div className="bajo-barra pointer-events-none flex flex-col items-start gap-2 *:pointer-events-auto">
+        <AvisosPWA />
         {rutaCalculada && (
           <div className="flex h-control items-center gap-3 rounded-card bg-ink pl-4 pr-1.5 text-on-ink shadow-flotante">
             <span role="status" className="flex items-baseline gap-2">
