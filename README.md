@@ -1,42 +1,129 @@
 # RutaPoli
 
-Mapa interactivo **no oficial** del Instituto Politécnico Nacional (IPN). Proyecto
-independiente hecho por estudiantes; no pertenece ni está avalado por el IPN.
+Mapa interactivo **no oficial** de los campus del Instituto Politécnico Nacional (IPN): Zacatenco y
+Santo Tomás. Proyecto independiente hecho por estudiantes; **no pertenece ni está avalado por el IPN** y
+no usa su escudo ni su marca.
+
+- Busca escuelas, bibliotecas, cafeterías y más (entiende siglas como «ESCOM» y nombres sin acentos).
+- Cómo llegar: Metro, estaciones, paradas y accesos cercanos, y ruta a pie entre dos puntos.
+- Hoy en el campus: clima, calidad del aire y sismos recientes, con su fuente y hora.
+- Comparte un lugar con un enlace (`/?campus=…&lugar=…`).
+- Se instala como app y funciona sin conexión con lo que ya viste.
+
+Todo lo que viene de OpenStreetMap está marcado **sin verificar** hasta que alguien lo confirme en campo.
+¿Quieres ayudar? Lee [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Desarrollo
 
+Requiere Node 20.19 o superior.
+
 ```bash
 npm install
-npm run dev        # servidor de desarrollo
-npm test           # pruebas (Vitest)
-npm run lint       # ESLint
-npm run format     # Prettier
-npm run build      # build de producción
+npm run dev          # servidor de desarrollo (http://localhost:5173)
+npm test             # pruebas (Vitest)
+npm run lint         # ESLint
+npm run format       # Prettier
+npm run build        # build de producción en dist/
+npm run pages:dev    # build + emulación local de Cloudflare Pages (http://localhost:8788)
 ```
 
-## Estructura
+`npm run pages:dev` es la forma más fiel de probar producción: sirve `dist/` con la función
+`/api/sismos`, los encabezados de `public/_headers` (CSP incluida) y el service worker.
 
-- `src/lib/config.ts`: nombre de la app (una sola constante).
-- `src/styles/tokens.css`: tokens de diseño (colores claro/oscuro, radios, tipografía).
-- `src/components/`: componentes reutilizables.
-- `src/features/`: funciones por dominio (mapa, búsqueda...).
-- `src/data/`: datos en JSON (lugares por campus).
+### Estructura
 
-Estado: Fase 6 (multicampus) + rediseño de la interfaz para PC y móvil.
+- `src/lib/`: lógica pura y probada (búsqueda, datos, rutas, datos en vivo, ocupación…).
+- `src/features/`: funciones por dominio (mapa, lugares, ruta, en vivo, ocupación, PWA).
+- `src/components/`: componentes reutilizables (panel, botones, buscador, filtros).
+- `src/styles/tokens.css`: tokens de diseño; ningún componente usa colores o tamaños sueltos.
+- `src/data/`: datos por campus (`<campus>.lugares.json`, `.limite.json`, `.servicios.json`).
+- `src/lib/config.ts`: nombre de la app (una sola constante) y textos del aviso.
+- `scripts/`: importador de OpenStreetMap y utilidades de datos.
+- `functions/api/sismos.ts`: proxy del SSN (Cloudflare Pages Function).
+- `worker/`: Worker de ocupación (Cloudflare Workers + D1), se despliega aparte.
+- `pwa.config.ts`: manifest y estrategia de caché offline.
 
-## Datos
+## Publicar (Cloudflare Pages)
 
-`npm run importar:osm` consulta Overpass y regenera `src/data/zacatenco.lugares.json`.
-Todo lo importado entra con `verificado: false`. Datos © colaboradores de OpenStreetMap (ODbL). Teselas de OpenFreeMap.
+El sitio es estático más una función (`/api/sismos`). Se eligió Cloudflare Pages porque el Worker de
+ocupación ya vive en Cloudflare: todo queda en una plataforma y en su plan gratuito. HTTPS, compresión y
+CDN los pone Cloudflare.
 
-## Cómo llegar (Fase 3)
+1. Necesitas una cuenta de Cloudflare. Inicia sesión desde la terminal: `npx wrangler login`.
+2. (Opcional) Si ya publicaste el Worker de ocupación, crea `.env.production.local` con
+   `VITE_API_OCUPACION=https://<tu-worker>.workers.dev`.
+3. `npm run deploy` construye y publica en el proyecto `rutapoli` (la primera vez lo crea y te da la URL
+   `https://rutapoli.pages.dev`).
+4. Agrega esa URL a `ORIGENES_PERMITIDOS` en `worker/wrangler.jsonc` y vuelve a desplegar el Worker.
 
-- Accesos, Metro y paradas salen de OpenStreetMap con `npm run importar:osm` (todo `verificado: false`).
-  Ojo: reimportar sobrescribe `src/data/zacatenco.lugares.json`; si ya corregiste datos a mano, haz un respaldo.
-- Rutas a pie: OSRM de FOSSGIS (`https://routing.openstreetmap.de/routed-foot`). Política: máx. 1 petición/s,
-  sin uso masivo, atribución y enlace "Corregir el mapa". Las coordenadas de origen y destino se envían a ese servidor.
+Alternativa: conectar el repositorio de GitHub en el panel de Cloudflare Pages
+(comando de build `npm run build`, carpeta `dist`), para publicar en cada push.
 
-## Datos en vivo (Fase 4)
+## App instalable y sin conexión (PWA)
+
+- **Instalable**: manifest con nombre, íconos propios (incluido uno _maskable_) y service worker.
+  Chrome no reporta errores de instalabilidad.
+- **Sin conexión** (verificado en Chrome con la red cortada): abre la app, el mapa base ya visitado, los
+  lugares y polígonos de **ambos** campus, la búsqueda y los enlaces compartidos. Aparece un aviso
+  «Sin conexión». Las rutas y los datos en vivo necesitan red y lo dicen.
+- **Qué se guarda**: la app y los datos de lugares se precachean (~2.2 MB). Del mapa base solo las teselas
+  que ya viste (máx. 1,500, 30 días), dentro de los
+  [términos de OpenFreeMap](https://openfreemap.org/tos/) para uso offline. Nunca se descargan áreas en bloque.
+- **Actualizaciones**: cuando hay una versión nueva, la app pregunta antes de recargar.
+
+## Calidad
+
+- 129 pruebas (Vitest): búsqueda con los datos reales, validación y carga de datos de todos los campus,
+  importador de OSM, geometría, rutas, datos en vivo con respuestas reales guardadas, caché, ocupación
+  (reglas y Worker) y proxy del SSN.
+- Lighthouse 12 sobre el build de producción (servidor local; en móvil, mediana de 3 corridas):
+
+| Categoría                | Móvil | PC     |
+| ------------------------ | ----- | ------ |
+| Rendimiento              | 60    | 97     |
+| Accesibilidad            | 100   | 100    |
+| Buenas prácticas         | 100   | 100    |
+| SEO                      | 100   | 100    |
+| First Contentful Paint   | 2.8 s | 0.6 s  |
+| Largest Contentful Paint | 4.1 s | 0.8 s  |
+| Total Blocking Time      | 1.0 s | 0.13 s |
+| Cumulative Layout Shift  | 0.05  | 0.01   |
+
+El rendimiento en móvil lo limita MapLibre (dibujo WebGL con la CPU 4× más lenta que simula Lighthouse).
+Como referencia, el mapa de travesiaunam.com, con el mismo tipo de mapa, obtiene 55 en la misma prueba.
+El mapa se carga aparte del resto para que la interfaz aparezca antes (bundle inicial: 87 KB gzip).
+
+## Datos, fuentes y licencias
+
+| Qué                                                    | Fuente                                                                         | Licencia / condiciones                                                                                                                        |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lugares, polígonos de campus, accesos, Metro y paradas | © colaboradores de [OpenStreetMap](https://www.openstreetmap.org/copyright)    | [ODbL 1.0](https://opendatacommons.org/licenses/odbl/). `src/data/*.lugares.json` y `*.limite.json` son una base de datos derivada bajo ODbL. |
+| Mapa base (teselas vectoriales, estilos)               | [OpenFreeMap](https://openfreemap.org) con esquema OpenMapTiles                | MIT; atribución «OpenFreeMap © OpenMapTiles Data from OpenStreetMap», visible siempre en el mapa.                                             |
+| Rutas a pie                                            | OSRM del servidor de [FOSSGIS](https://routing.openstreetmap.de/about.html)    | Máx. 1 petición/s, sin uso masivo, atribución y enlace «Corregir el mapa». Las coordenadas se envían a ese servidor.                          |
+| Clima                                                  | [Open-Meteo](https://open-meteo.com/)                                          | CC BY 4.0, solo uso no comercial en el plan gratuito.                                                                                         |
+| Calidad del aire                                       | Open-Meteo con datos de CAMS ([Copernicus](https://atmosphere.copernicus.eu/)) | CC BY 4.0. Contiene información modificada del Servicio de Monitoreo Atmosférico de Copernicus. Es un modelo, no una estación.                |
+| Sismos                                                 | [Servicio Sismológico Nacional](http://www.ssn.unam.mx/), UNAM (RSS público)   | Se cita la fuente y se enlaza. Antes de un uso más amplio, revisa las condiciones del SSN.                                                    |
+| Tipografías                                            | Inter y Space Grotesk (vía Fontsource)                                         | SIL Open Font License 1.1.                                                                                                                    |
+| Mapa interactivo                                       | [MapLibre GL JS](https://maplibre.org/)                                        | BSD-3-Clause.                                                                                                                                 |
+
+**Licencia del código:** pendiente de elegir por quien mantiene el proyecto (sugerencia: MIT). Hasta que
+haya un archivo `LICENSE`, el código no tiene licencia de reutilización.
+
+## Cómo funciona
+
+### Datos
+
+`npm run importar:osm -- <campus>` consulta Overpass y regenera `src/data/<campus>.lugares.json` y
+`.limite.json`. Todo lo importado entra con `verificado: false`. Reimportar sobrescribe esos dos archivos
+(nunca `servicios.json`): si corriges algo a mano, mejor corrígelo en OpenStreetMap.
+
+### Cómo llegar
+
+- Accesos, Metro y paradas salen de OpenStreetMap con el importador (todo `verificado: false`).
+- Rutas a pie: OSRM de FOSSGIS (`https://routing.openstreetmap.de/routed-foot`), con límite de 1 petición/s
+  y caché de la sesión.
+
+### Datos en vivo
 
 | Dato             | Fuente                                | Notas                                                                                          |
 | ---------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -44,11 +131,11 @@ Todo lo importado entra con `verificado: false`. Datos © colaboradores de OpenS
 | Calidad del aire | Open-Meteo, modelo CAMS (Copernicus)  | Estimación de modelo global (~45 km), no una estación. AQI de EE. UU., no IMECA. Caché 30 min. |
 | Sismos           | Servicio Sismológico Nacional (RSS)   | El SSN solo ofrece HTTP y sin CORS: se lee a través de `/api/sismos`. Caché 5 min.             |
 
-`/api/sismos` es un proxy mínimo: en desarrollo lo hace Vite (`vite.config.ts`); en producción,
-la función `api/sismos.ts` (formato Vercel Functions, **aún no probada desplegada**). Sin ella, la tarjeta
-muestra el error de sismos y el resto sigue funcionando.
+`/api/sismos` es un proxy mínimo: en desarrollo lo hace Vite (`vite.config.ts`); en producción, la
+Pages Function `functions/api/sismos.ts` (probada con `npm run pages:dev`). Si falla, la tarjeta muestra el
+error de sismos y el resto sigue funcionando.
 
-## Enchufes y zonas silenciosas (Fase 5-C)
+### Enchufes y zonas silenciosas
 
 Los datos viven en `src/data/zacatenco.servicios.json` (separado de `zacatenco.lugares.json`, que se
 regenera desde OSM). Está vacío hasta que alguien aporte datos reales: **no se inventan**.
@@ -80,7 +167,7 @@ regenera desde OSM). Está vacío hasta que alguien aporte datos reales: **no se
 - El botón «Sugerir datos» abre un issue prellenado; se activa al poner la dirección del repositorio en
   `URL_REPOSITORIO` (`src/lib/config.ts`).
 
-## Ocupación reportada por estudiantes (Fase 5-A)
+### Ocupación reportada por estudiantes
 
 Piloto en **cafeterías y bibliotecas** (`CATEGORIAS_CON_OCUPACION`). Cada persona reporta en un toque
 (Vacío / Poca gente / Concurrido / Lleno) y el detalle del lugar muestra la **mediana** de los últimos 45 min.
@@ -94,7 +181,7 @@ Si no hay suficientes reportes, se dice «sin datos recientes»: no se inventa n
 dispositivo y un hash de la IP con sal diaria (nunca la IP), por 24 h, para frenar abusos.
 Conviene publicar un aviso de privacidad propio antes de abrir la función al público.
 
-### Probar en local
+#### Probar en local
 
 ```bash
 echo "SAL_SECRETA=cualquier-texto-local" > worker/.dev.vars   # no se sube a git
@@ -104,14 +191,16 @@ echo "VITE_API_OCUPACION=http://localhost:8787" > .env.local
 npm run dev                      # reinicia Vite para que lea .env.local
 ```
 
-### Publicar el Worker (necesita una cuenta de Cloudflare; lo haces tú)
+#### Publicar el Worker (necesita una cuenta de Cloudflare)
 
 1. `npx wrangler d1 create rutapoli-ocupacion` y copia el `database_id` a `worker/wrangler.jsonc`.
 2. `npx wrangler d1 execute rutapoli-ocupacion --remote --file=worker/schema.sql`
 3. `npx wrangler secret put SAL_SECRETA --config worker/wrangler.jsonc` (un texto largo y aleatorio).
 4. En `worker/wrangler.jsonc`, pon el dominio real en `ORIGENES_PERMITIDOS` y ejecuta
    `npx wrangler deploy --config worker/wrangler.jsonc`.
-5. Al construir el sitio define `VITE_API_OCUPACION=https://<tu-worker>.workers.dev`. Sin esa variable, la función queda oculta.
+5. Al construir el sitio define `VITE_API_OCUPACION=https://<tu-worker>.workers.dev` (por ejemplo en
+   `.env.production.local`). Sin esa variable, la función queda oculta. Si el Worker no usa `*.workers.dev`,
+   agrega su dominio a `connect-src` en `public/_headers`.
 
 Si cambian los lugares: `npm run importar:osm` y luego `npm run generar:ocupacion` (la prueba avisa si se desincronizan).
 
@@ -121,7 +210,7 @@ Si cambian los lugares: `npm run importar:osm` y luego `npm run generar:ocupacio
 **Costos** (planes gratuitos de Cloudflare, verificados el 13-nov-2026): Workers 100,000 peticiones/día;
 D1 5 millones de filas leídas y 100,000 escritas por día, 5 GB. La lectura se cachea 20 s en memoria y 30 s en el navegador.
 
-## Multicampus (Fase 6)
+### Multicampus
 
 Campus disponibles: **Zacatenco** y **Santo Tomás**. El selector de campus cambia centro, polígono, lugares,
 filtros y clima sin recargar. Cada campus es su propio conjunto de archivos (`src/data/<id>.*.json`) y se
@@ -132,7 +221,7 @@ llevan el campus (`/?campus=santo-tomas&lugar=id`); si un enlace trae solo `luga
 > que están separados del Casco, como el CECyT 9. No hay paradas de camión mapeadas cerca en OSM (hoy hay 0);
 > los accesos son puertas de OSM sin nombre. Todo está sin verificar.
 
-### Cómo agregar un campus (ej. «Zacatenco II»)
+#### Cómo agregar un campus (ej. «Zacatenco II»)
 
 1. **Id.** Elige un id en minúsculas con guiones (`mi-campus`) y agrégalo al tipo `CampusId` en `src/lib/tipos.ts`.
 2. **Polígono en OSM.** En openstreetmap.org busca el campus (la vía `way` o relación `relation` que lo delimita) y
@@ -154,7 +243,7 @@ llevan el campus (`/?campus=santo-tomas&lugar=id`); si un enlace trae solo `luga
 
 Reimportar un campus sobrescribe `lugares.json` y `limite.json`, **nunca** `servicios.json`.
 
-## Diseño de la interfaz
+### Diseño de la interfaz
 
 El mapa ocupa toda la pantalla y el resto flota encima:
 
