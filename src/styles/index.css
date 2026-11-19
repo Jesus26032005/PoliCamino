@@ -74,11 +74,18 @@
   .panel[data-estado='min'] {
     top: calc(100% - var(--panel-min));
   }
+  /* Media altura: ~36 % de la pantalla, para que el mapa sea lo principal al abrir. */
   .panel[data-estado='medio'] {
-    top: 54%;
+    top: 64%;
   }
   .panel[data-estado='max'] {
-    top: 6.75rem;
+    top: 6.25rem;
+  }
+  /* Al mínimo solo se ven la manija y las pestañas (nada de contenido asomándose). */
+  @media (max-width: 55.99rem) {
+    .panel[data-estado='min'] #panel-contenido {
+      visibility: hidden;
+    }
   }
 
   /* Lo que flota justo debajo de la barra superior (resumen de ruta, avisos). */
@@ -87,7 +94,7 @@
     z-index: 10;
     left: 0.75rem;
     right: 0.75rem;
-    top: 6.75rem;
+    top: 6.25rem;
   }
 
   /* Tablet vertical: la hoja no se estira a todo el ancho; deja el mapa visible a la derecha. */
@@ -136,7 +143,7 @@
 }
 .app[data-hoja='medio'],
 .app[data-hoja='max'] {
-  --mapa-abajo: 46%;
+  --mapa-abajo: 36%;
 }
 /* Tablet y escritorio: la hoja/panel no llega a la esquina derecha, los controles bajan. */
 @media (min-width: 40rem) {
@@ -152,6 +159,14 @@
 .maplibregl-ctrl-group {
   border-radius: var(--radius-control) !important;
   overflow: hidden;
+}
+
+/* En móvil se hace zoom con dos dedos: + y − solo estorban sobre el mapa. */
+@media (max-width: 55.99rem) {
+  .app .maplibregl-ctrl-zoom-in,
+  .app .maplibregl-ctrl-zoom-out {
+    display: none;
+  }
 }
 
 /* Punto azul de "¿Dónde estoy?" */

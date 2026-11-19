@@ -89,10 +89,10 @@ function escribirUrl(campusId: CampusId, lugarId: string | null) {
 function rellenoDelMapa(hoja: EstadoHoja): Relleno {
   if (esEscritorioAhora()) return { top: 88, right: 16, bottom: 16, left: 430 }
   return {
-    top: 116,
+    top: 100,
     right: 12,
     left: 12,
-    bottom: hoja === 'min' ? 96 : Math.round(window.innerHeight * 0.46),
+    bottom: hoja === 'min' ? 96 : Math.round(window.innerHeight * 0.36),
   }
 }
 
@@ -389,11 +389,13 @@ export default function App() {
         >
           Ir al buscador
         </a>
-        <div className="flotante flex h-control items-center gap-2.5 rounded-card p-2 desk:pr-4">
+        {/* En móvil se omite el bloque del logo: deja espacio al buscador. */}
+        {!escritorio && <h1 className="sr-only">{APP_NAME}</h1>}
+        <div className="flotante hidden h-control items-center gap-2.5 rounded-card p-2 desk:flex desk:pr-4">
           <span className="flex size-9 items-center justify-center rounded-control bg-primary text-on-primary">
             <Icono nombre="ruta" tam={20} />
           </span>
-          <h1 className="sr-only font-display text-body font-bold tracking-tight desk:not-sr-only">
+          <h1 className="font-display text-body font-bold tracking-tight">
             {APP_NAME}
           </h1>
         </div>
@@ -434,7 +436,7 @@ export default function App() {
             setPestana('hoy')
             setHoja('max')
           }}
-          className="h-control shrink-0 gap-1.5! rounded-card px-2.5! desk:gap-2! desk:px-4!"
+          className="h-touch shrink-0 gap-1.5! rounded-card px-3! desk:h-control desk:gap-2! desk:px-4!"
         >
           {/* En pantallas de 320 px se omite el ícono para que quepa el buscador. */}
           {!angosta && <Icono nombre="nube" tam={escritorio ? 20 : 18} />}
@@ -459,7 +461,7 @@ export default function App() {
           disabled={ubic.estado === 'buscando'}
           aria-label="¿Dónde estoy?"
           title="¿Dónde estoy?"
-          className="size-control shrink-0 rounded-card px-0 shadow-flotante"
+          className="size-touch shrink-0 rounded-card px-0 shadow-flotante desk:size-control"
         >
           <Icono nombre="ubicacion" />
         </Boton>
@@ -524,22 +526,27 @@ export default function App() {
             />
           ) : (
             <>
-              <div className="flex flex-col gap-3">
+              {escritorio ? (
                 <div>
                   <h2 className="font-display text-display font-bold leading-tight tracking-tight">
                     {campus.nombre}
                   </h2>
                   <p className="text-small text-muted">{campus.nombreLargo}</p>
                 </div>
-                {!escritorio && (
+              ) : (
+                // Móvil: el selector ya dice en qué campus estás; el título grande sobraba.
+                <div className="flex flex-col gap-2">
+                  <h2 className="sr-only">
+                    {campus.nombre}: {campus.nombreLargo}
+                  </h2>
                   <SelectorCampus
                     campus={campusId}
                     opciones={CAMPUS_LISTA}
                     onCambiar={cambiarCampus}
                     className="self-start bg-soft"
                   />
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Móvil: atajos a escuelas (en escritorio están en la barra superior). */}
               {!escritorio && atajos.length > 0 && (
@@ -610,11 +617,21 @@ export default function App() {
               )}
 
               {/* En móvil las cifras van después de lo que más se usa (escuelas y categorías). */}
-              {!escritorio && cifras}
+              {/* Móvil: las cifras en una sola línea, sin tarjetas. */}
+              {!escritorio && (
+                <p className="text-small text-muted">
+                  <strong className="font-semibold text-text">{lugares.length}</strong> lugares ·{' '}
+                  <strong className="font-semibold text-text">{nMetro}</strong> estaciones de
+                  Metro cerca ·{' '}
+                  <strong className="font-semibold text-text">{conteoDe('acceso')}</strong>{' '}
+                  accesos
+                </p>
+              )}
 
               <p className="mt-auto border-t border-border pt-3 text-mini leading-relaxed text-muted">
-                {DISCLAIMER_TEXT} Lugares tomados de OpenStreetMap, sin verificar en
-                campo.
+                {/* En móvil el aviso de «no oficial» ya está en la barra superior. */}
+                {escritorio && <>{DISCLAIMER_TEXT} </>}Lugares tomados de OpenStreetMap,
+                sin verificar en campo.
                 {TEXTO_MAPA_OFFLINE[mapaOffline] && (
                   <span role="status" className="mt-1 block">
                     {TEXTO_MAPA_OFFLINE[mapaOffline]}

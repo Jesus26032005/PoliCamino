@@ -101,7 +101,7 @@ export function Buscador({
         onKeyDown={alTeclear}
         className={`w-full px-4 text-body text-text placeholder:text-muted ${
           flotante
-            ? 'flotante h-control rounded-card'
+            ? 'flotante h-touch rounded-card desk:h-control'
             : 'min-h-touch rounded-control border border-border-strong bg-soft'
         }`}
       />
