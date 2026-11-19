@@ -76,7 +76,7 @@ export function Panel<T extends string>({
             aria-controls="panel-contenido"
             tabIndex={p.id === activa ? 0 : -1}
             onClick={() => onPestana(p.id)}
-            className={`min-h-touch flex-1 rounded-control px-2 text-small ${
+            className={`min-h-touch flex-1 whitespace-nowrap rounded-control px-2 text-small ${
               p.id === activa
                 ? 'bg-primary-soft font-semibold text-primary'
                 : 'font-medium text-muted'

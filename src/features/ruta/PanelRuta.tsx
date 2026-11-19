@@ -33,7 +33,12 @@ function Pestanas({ pestana, onPestana }: Pick<Props, 'pestana' | 'onPestana'>) 
     ['ruta', 'Ruta a pie'],
   ]
   return (
-    <div role="tablist" aria-label="Cómo llegar" className="flex gap-2">
+    // Control segmentado (como el selector de campus): elige qué ver, no es una acción.
+    <div
+      role="tablist"
+      aria-label="Cómo llegar"
+      className="flex gap-1 rounded-control bg-soft p-1"
+    >
       {opciones.map(([id, texto]) => (
         <button
           key={id}
@@ -41,10 +46,10 @@ function Pestanas({ pestana, onPestana }: Pick<Props, 'pestana' | 'onPestana'>) 
           role="tab"
           aria-selected={pestana === id}
           onClick={() => onPestana(id)}
-          className={`min-h-touch flex-1 rounded-control border px-3 font-medium ${
+          className={`min-h-touch flex-1 whitespace-nowrap rounded-control px-2 text-small ${
             pestana === id
-              ? 'border-primary bg-primary text-on-primary'
-              : 'border-border bg-surface text-text'
+              ? 'bg-ink font-semibold text-on-ink'
+              : 'font-medium text-muted'
           }`}
         >
           {texto}

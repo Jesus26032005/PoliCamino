@@ -14,8 +14,16 @@ import type { LatLng } from '../../lib/tipos'
 import type { EnVivo } from './useEnVivo'
 import type { EstadoFuente } from './useFuente'
 
+// Reloj de 24 h, igual que la hora del dato que da la fuente («14:00»).
 const hora = (ms: number) =>
-  new Date(ms).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+  new Date(ms).toLocaleTimeString('es-MX', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+
+/** Número y unidad que nunca se separan al cambiar de línea (espacio no separable). */
+const conUnidad = (n: number | string, unidad: string) => `${n}\u00a0${unidad}`
 
 function Seccion<T>({
   titulo,
@@ -80,11 +88,13 @@ function VistaClima({ c }: { c: Clima }) {
   return (
     <>
       <p className="font-display text-title font-bold leading-tight">
-        {Math.round(c.temperaturaC)} °C · {descripcionClima(c.codigo)}
+        {conUnidad(Math.round(c.temperaturaC), '°C')} · {descripcionClima(c.codigo)}
       </p>
       <p className="text-small text-muted">
-        Sensación {Math.round(c.sensacionC)} °C · Humedad {Math.round(c.humedadPct)} % ·
-        Viento {Math.round(c.vientoKmh)} km/h · Lluvia {c.precipitacionMm} mm
+        Sensación {conUnidad(Math.round(c.sensacionC), '°C')} · Humedad{' '}
+        {conUnidad(Math.round(c.humedadPct), '%')} · Viento{' '}
+        {conUnidad(Math.round(c.vientoKmh), 'km/h')} · Lluvia{' '}
+        {conUnidad(c.precipitacionMm, 'mm')}
       </p>
     </>
   )
@@ -97,8 +107,9 @@ function VistaAire({ a }: { a: Aire }) {
         AQI {Math.round(a.usAqi)} · {categoriaAqi(a.usAqi)}
       </p>
       <p className="text-small text-muted">
-        PM2.5 {a.pm25.toFixed(1)} µg/m³ · PM10 {a.pm10.toFixed(1)} µg/m³ · Ozono{' '}
-        {a.ozono.toFixed(0)} µg/m³
+        PM2.5 {conUnidad(a.pm25.toFixed(1), 'µg/m³')} · PM10{' '}
+        {conUnidad(a.pm10.toFixed(1), 'µg/m³')} · Ozono{' '}
+        {conUnidad(a.ozono.toFixed(0), 'µg/m³')}
       </p>
       <p className="text-small text-muted">
         Es una estimación de un modelo global (CAMS, celdas de ~45 km), no una medición de

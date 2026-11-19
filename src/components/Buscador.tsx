@@ -16,6 +16,13 @@ type Props = {
   enLinea?: boolean
   /** Campo flotante sobre el mapa (barra superior en móvil). */
   flotante?: boolean
+  /** id fijo del campo (para el enlace «Ir al buscador»). */
+  idEntrada?: string
+  /**
+   * La lista flotante se ancla al contenedor posicionado más cercano (la barra superior)
+   * en vez de al campo: en móvil usa todo el ancho y los nombres largos no se apilan.
+   */
+  listaAncha?: boolean
 }
 
 /** Buscador con lista de resultados (patrón ARIA "combobox con listbox"). */
@@ -28,8 +35,11 @@ export function Buscador({
   valorInicial = '',
   enLinea = false,
   flotante = false,
+  idEntrada,
+  listaAncha = false,
 }: Props) {
   const id = useId()
+  const entradaId = idEntrada ?? `${id}-entrada`
   const listaId = `${id}-lista`
   const entrada = useRef<HTMLInputElement>(null)
   const [consulta, setConsulta] = useState(valorInicial)
@@ -64,13 +74,13 @@ export function Buscador({
   }
 
   return (
-    <div role="search" className={`relative ${className}`}>
-      <label htmlFor={`${id}-entrada`} className="sr-only">
+    <div role="search" className={`${listaAncha ? '' : 'relative'} ${className}`}>
+      <label htmlFor={entradaId} className="sr-only">
         {etiqueta}
       </label>
       <input
         ref={entrada}
-        id={`${id}-entrada`}
+        id={entradaId}
         type="search"
         role="combobox"
         aria-expanded={mostrar}
@@ -98,8 +108,10 @@ export function Buscador({
 
       {mostrar && (
         <div
-          className={`mt-1 overflow-hidden rounded-control border border-border bg-surface ${
-            enLinea ? '' : 'absolute inset-x-0 top-full z-30 shadow-flotante'
+          className={`mt-1 rounded-control border border-border bg-surface ${
+            enLinea
+              ? 'overflow-hidden'
+              : 'absolute inset-x-0 top-full z-30 max-h-[60vh] overflow-y-auto shadow-flotante'
           }`}
         >
           <ul id={listaId} role="listbox" aria-label="Resultados">

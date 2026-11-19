@@ -88,6 +88,24 @@ const centroLibre = (r: Relleno): [number, number] => [
 
 const tamanoIcono = (seleccionadoId: string | null) =>
   ['case', ['==', ['get', 'id'], seleccionadoId ?? ''], 1.3, 1] as never
+/** Distancia (em) del nombre a su ícono; el elegido es 1.3 veces más grande. */
+const distanciaNombre = (seleccionadoId: string | null) =>
+  ['case', ['==', ['get', 'id'], seleccionadoId ?? ''], 2.4, 1.9] as never
+/** El lugar elegido se coloca primero: si algo choca con él, se oculta lo otro. */
+const ordenIcono = (seleccionadoId: string | null) =>
+  ['case', ['==', ['get', 'id'], seleccionadoId ?? ''], 0, 1] as never
+
+/** Textos de los controles de MapLibre (por defecto vienen en inglés). */
+const TEXTOS_MAPA = {
+  'AttributionControl.ToggleAttribution': 'Mostrar u ocultar créditos del mapa',
+  'AttributionControl.MapFeedback': 'Reportar un error del mapa',
+  'Map.Title': 'Mapa',
+  'Marker.Title': 'Marcador',
+  'NavigationControl.ResetBearing': 'Girar el mapa; clic para apuntar al norte',
+  'NavigationControl.ZoomIn': 'Acercar',
+  'NavigationControl.ZoomOut': 'Alejar',
+  'Popup.Close': 'Cerrar',
+}
 
 /** Botón «3D» junto al zoom: inclina el mapa y levanta los edificios. */
 class Control3D implements IControl {
@@ -194,7 +212,8 @@ function instalarCapas(
     type: 'geojson',
     data: lugaresAGeoJSON(lugares) as never,
     cluster: true,
-    clusterRadius: 36,
+    // Radio amplio: menos círculos «2» y «3» sueltos en la vista general.
+    clusterRadius: 52,
     clusterMaxZoom: 15,
   })
   map.addLayer({
@@ -255,18 +274,9 @@ function instalarCapas(
     },
   })
 
-  map.addLayer({
-    id: 'lugares-puntos',
-    type: 'symbol',
-    source: FUENTE,
-    filter: ['!', ['has', 'point_count']],
-    layout: {
-      'icon-image': ['concat', 'icono-', ['get', 'categoria']],
-      'icon-size': tamanoIcono(seleccionadoId),
-      'icon-allow-overlap': true,
-    },
-  })
-  // Nombres (o siglas) bajo los íconos al acercarse; se ocultan si chocan entre sí.
+  // Nombres bajo los íconos al acercarse. Van en una capa DEBAJO de los íconos: MapLibre
+  // coloca primero las capas de arriba, así que cada nombre esquiva todos los íconos ya
+  // puestos (si no cabe en ningún lado, se oculta y queda solo el ícono).
   map.addLayer({
     id: 'lugares-nombres',
     type: 'symbol',
@@ -277,12 +287,28 @@ function instalarCapas(
       'text-field': ['get', 'etiqueta'],
       'text-font': ['Noto Sans Medium'],
       'text-size': 12,
-      'text-anchor': 'top',
-      'text-offset': [0, 1.5],
-      'text-max-width': 9,
-      'text-optional': true,
+      'text-variable-anchor': ['top', 'bottom', 'right', 'left'],
+      'text-radial-offset': distanciaNombre(seleccionadoId),
+      'text-justify': 'auto',
+      'text-max-width': 8,
+      'text-padding': 1,
+      'symbol-sort-key': ordenIcono(seleccionadoId),
     },
     paint: { 'text-color': texto, 'text-halo-color': superficie, 'text-halo-width': 1.6 },
+  })
+  // Íconos. En 3D la perspectiva junta los puntos: ahí se ocultan los que chocan
+  // (el elegido se coloca primero y siempre queda).
+  map.addLayer({
+    id: 'lugares-puntos',
+    type: 'symbol',
+    source: FUENTE,
+    filter: ['!', ['has', 'point_count']],
+    layout: {
+      'icon-image': ['concat', 'icono-', ['get', 'categoria']],
+      'icon-size': tamanoIcono(seleccionadoId),
+      'icon-allow-overlap': !tresD,
+      'symbol-sort-key': ordenIcono(seleccionadoId),
+    },
   })
 }
 
@@ -341,6 +367,7 @@ export function Mapa({
       pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
       fadeDuration: 0,
       attributionControl: false,
+      locale: TEXTOS_MAPA,
     })
     mapRef.current = map
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__mapa = map // pruebas
@@ -357,6 +384,8 @@ export function Mapa({
         for (const id of [CAPA_EDIFICIOS_3D, `${SELECCION}-3d`])
           if (map.getLayer(id))
             map.setLayoutProperty(id, 'visibility', activo ? 'visible' : 'none')
+        if (map.getLayer('lugares-puntos'))
+          map.setLayoutProperty('lugares-puntos', 'icon-allow-overlap', !activo)
         map.easeTo({
           pitch: activo ? 55 : 0,
           bearing: activo ? -17 : 0,
@@ -476,8 +505,12 @@ export function Mapa({
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    if (map.getLayer('lugares-puntos'))
+    if (map.getLayer('lugares-puntos')) {
       map.setLayoutProperty('lugares-puntos', 'icon-size', tamanoIcono(seleccionadoId))
+      map.setLayoutProperty('lugares-puntos', 'symbol-sort-key', ordenIcono(seleccionadoId))
+      map.setLayoutProperty('lugares-nombres', 'symbol-sort-key', ordenIcono(seleccionadoId))
+      map.setLayoutProperty('lugares-nombres', 'text-radial-offset', distanciaNombre(seleccionadoId))
+    }
     const fuenteSel = () => map.getSource(SELECCION) as GeoJSONSource | undefined
     fuenteSel()?.setData(VACIO as never)
     if (!seleccionado) return

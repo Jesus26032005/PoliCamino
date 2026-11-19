@@ -4,7 +4,9 @@ import { cajaDeGeometria, dentroDeLimites } from './geo'
 import {
   cargarLimite,
   cargarLugares,
+  etiquetaMapa,
   lugaresAGeoJSON,
+  MAX_ETIQUETA,
   validarLugar,
   validarLugares,
 } from './lugares'
@@ -49,6 +51,17 @@ describe('lugaresAGeoJSON', () => {
     expect(lugaresAGeoJSON([base]).features[0].properties.etiqueta).toBe('Prueba')
     const conSigla = { ...base, alias: ['ESCOM'] }
     expect(lugaresAGeoJSON([conSigla]).features[0].properties.etiqueta).toBe('ESCOM')
+  })
+  it('acorta nombres largos para el mapa', () => {
+    expect(etiquetaMapa({ nombre: 'Acceso cerca de «Unidad Pemex / ESIA Zacatenco»' })).toBe(
+      'Acceso',
+    )
+    const largo = etiquetaMapa({
+      nombre: 'Biblioteca Nacional de Ciencia y Tecnología "Víctor Bravo Ahuja"',
+    })
+    expect(largo).toBe('Biblioteca Nacional…')
+    expect(largo.length).toBeLessThanOrEqual(MAX_ETIQUETA + 1)
+    expect(etiquetaMapa({ nombre: 'Cafetería 8' })).toBe('Cafetería 8')
   })
 })
 

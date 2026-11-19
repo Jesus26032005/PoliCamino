@@ -109,6 +109,21 @@ export type LugaresGeoJSON = {
   }[]
 }
 
+/** Largo máximo de un nombre bajo su ícono; los más largos se recortan con «…». */
+export const MAX_ETIQUETA = 22
+
+/**
+ * Texto corto para el mapa: la sigla si la hay (ESCOM); si no, el nombre sin la
+ * referencia «cerca de …» (que solo ubica, y ya se ve en el mapa) y recortado por palabras.
+ */
+export function etiquetaMapa(l: Pick<Lugar, 'nombre' | 'alias'>): string {
+  if (l.alias?.[0]) return l.alias[0]
+  const nombre = l.nombre.replace(/\s+cerca de\s+«[^»]*»/i, '').trim()
+  if (nombre.length <= MAX_ETIQUETA) return nombre
+  const corte = nombre.slice(0, MAX_ETIQUETA).replace(/[\s,;:/·-]+\S*$/, '')
+  return `${corte || nombre.slice(0, MAX_ETIQUETA)}…`
+}
+
 /** GeoJSON usa [lng, lat], al revés que nuestras coordenadas. */
 export function lugaresAGeoJSON(lugares: Lugar[]): LugaresGeoJSON {
   return {
@@ -120,7 +135,7 @@ export function lugaresAGeoJSON(lugares: Lugar[]): LugaresGeoJSON {
       properties: {
         id: l.id,
         nombre: l.nombre,
-        etiqueta: l.alias?.[0] ?? l.nombre,
+        etiqueta: etiquetaMapa(l),
         categoria: l.categoria,
         verificado: l.verificado,
       },

@@ -10,14 +10,15 @@ type Props = {
 
 /**
  * Interruptores por categoría: encendida = se ve en el mapa.
- * En móvil son baldosas en dos columnas; en escritorio, filas con interruptor.
+ * Mismo control en móvil y escritorio: baldosas en dos columnas con casilla.
+ * Encendida: fondo de color y palomita. Apagada: sin fondo, casilla vacía y texto tenue.
  */
 export function FiltroCategorias({ conteo, apagadas, onAlternar }: Props) {
   return (
     <div
       role="group"
       aria-label="Categorías visibles en el mapa"
-      className="grid grid-cols-2 gap-2 desk:grid-cols-1 desk:gap-0"
+      className="grid grid-cols-2 gap-2"
     >
       {CATEGORIAS.filter((c) => conteo.has(c)).map((c) => {
         const encendida = !apagadas.has(c)
@@ -29,27 +30,37 @@ export function FiltroCategorias({ conteo, apagadas, onAlternar }: Props) {
             aria-checked={encendida}
             aria-label={`Mostrar ${INFO_CATEGORIA[c].etiqueta} en el mapa (${conteo.get(c)} lugares)`}
             onClick={() => onAlternar(c)}
-            className={`flex min-h-touch items-center gap-2.5 rounded-control border px-3 text-left text-small desk:border-transparent desk:bg-transparent desk:px-1 desk:text-body ${
+            className={`flex min-h-touch items-center gap-2 rounded-control border px-2.5 text-left text-small ${
               encendida
                 ? 'border-primary bg-primary-soft text-text'
-                : 'border-border text-muted'
+                : 'border-border border-dashed text-muted'
             }`}
           >
             <span
               aria-hidden="true"
-              className="size-2.5 shrink-0 rounded-pill"
-              style={{ backgroundColor: `var(--c-cat-${c})` }}
-            />
-            <span className="flex-1">{INFO_CATEGORIA[c].etiqueta}</span>
-            <span className="text-small text-muted">{conteo.get(c)}</span>
-            <span
-              aria-hidden="true"
-              className={`hidden h-7 w-12 shrink-0 rounded-pill p-1 desk:flex ${
-                encendida ? 'justify-end bg-primary' : 'bg-border-strong'
+              className={`flex size-4.5 shrink-0 items-center justify-center rounded-[0.3rem] border-2 ${
+                encendida ? 'border-primary bg-primary text-on-primary' : 'border-border-strong'
               }`}
             >
-              <span className="size-5 rounded-pill bg-on-ink" />
+              {encendida && (
+                <svg viewBox="0 0 12 12" width="10" height="10" fill="none">
+                  <path
+                    d="M2.5 6.2l2.3 2.3 4.7-5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
             </span>
+            <span
+              aria-hidden="true"
+              className={`size-2.5 shrink-0 rounded-pill ${encendida ? '' : 'opacity-40'}`}
+              style={{ backgroundColor: `var(--c-cat-${c})` }}
+            />
+            <span className="min-w-0 flex-1 truncate">{INFO_CATEGORIA[c].etiqueta}</span>
+            <span className="text-mini text-muted">{conteo.get(c)}</span>
           </button>
         )
       })}

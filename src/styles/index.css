@@ -35,6 +35,21 @@
   }
 
   /*
+   * Fila que se desliza de lado (atajos a escuelas): sin barra de desplazamiento y con
+   * un desvanecido al final que indica que hay más. El padding derecho del elemento
+   * permite que el último botón salga del desvanecido al llegar al final.
+   */
+  .desliza {
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+  }
+  .desliza::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
    * PANEL — en móvil es una hoja inferior con tres alturas (data-estado);
    * en escritorio es un panel lateral fijo a la izquierda.
    */
@@ -73,6 +88,15 @@
     left: 0.75rem;
     right: 0.75rem;
     top: 6.75rem;
+  }
+
+  /* Tablet vertical: la hoja no se estira a todo el ancho; deja el mapa visible a la derecha. */
+  @media (min-width: 40rem) and (max-width: 55.99rem) {
+    .panel {
+      left: 0.75rem;
+      right: auto;
+      width: min(28rem, 100% - 1.5rem);
+    }
   }
 
   @media (min-width: 56rem) {
@@ -114,7 +138,8 @@
 .app[data-hoja='max'] {
   --mapa-abajo: 46%;
 }
-@media (min-width: 56rem) {
+/* Tablet y escritorio: la hoja/panel no llega a la esquina derecha, los controles bajan. */
+@media (min-width: 40rem) {
   .app[data-hoja] {
     --mapa-abajo: 0px;
   }

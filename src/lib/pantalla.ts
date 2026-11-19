@@ -19,3 +19,17 @@ export function useEsEscritorio(): boolean {
 }
 
 export const esEscritorioAhora = () => window.matchMedia(CONSULTA).matches
+
+/** Celulares muy angostos (≤ 359 px, p. ej. 320 px): textos de la barra más cortos. */
+const ANGOSTA = '(max-width: 22.4375rem)'
+export function useEsAngosta(): boolean {
+  return useSyncExternalStore(
+    (avisar) => {
+      const mq = window.matchMedia(ANGOSTA)
+      mq.addEventListener('change', avisar)
+      return () => mq.removeEventListener('change', avisar)
+    },
+    () => window.matchMedia(ANGOSTA).matches,
+    () => false,
+  )
+}

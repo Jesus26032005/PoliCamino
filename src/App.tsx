@@ -33,7 +33,7 @@ import { busquedaCon, leerCampusDeUrl, leerLugarDeUrl } from './lib/enlaces'
 import { categoriaAqi, descripcionClima } from './lib/envivo'
 import { dentroDeLimites } from './lib/geo'
 import { cargarLimite, cargarLugares, type LimiteGeoJSON } from './lib/lugares'
-import { esEscritorioAhora, useEsEscritorio } from './lib/pantalla'
+import { esEscritorioAhora, useEsAngosta, useEsEscritorio } from './lib/pantalla'
 import { formatearDistancia, formatearDuracion, rutaAGeoJSON } from './lib/ruta'
 import {
   esSilencioso,
@@ -62,6 +62,8 @@ const TEXTO_MAPA_OFFLINE: Record<EstadoMapaOffline, string> = {
     'Tienes activado el ahorro de datos: el mapa no se guardó para usarlo sin conexión.',
   error: 'No se pudo guardar el mapa para usarlo sin conexión.',
 }
+
+const CLAVE_AVISO = 'rutapoli-aviso-visto'
 
 const PESTANAS = [
   { id: 'lugares', etiqueta: 'Lugares' },
@@ -118,6 +120,22 @@ export default function App() {
   const ubic = useUbicacion()
   const enVivo = useEnVivo(campus.centro)
   const escritorio = useEsEscritorio()
+  const angosta = useEsAngosta()
+  // El aviso de «no oficial» se ve completo en la primera visita; después, en corto (móvil).
+  const [avisoVisto] = useState(() => {
+    try {
+      return localStorage.getItem(CLAVE_AVISO) === '1'
+    } catch {
+      return false
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(CLAVE_AVISO, '1')
+    } catch {
+      /* sin almacenamiento: se sigue mostrando completo */
+    }
+  }, [])
   const mapaOffline = useEstadoMapaOffline()
 
   // Panel: pestaña activa y altura de la hoja inferior (solo móvil).
@@ -280,6 +298,16 @@ export default function App() {
     setHoja('medio')
   }
 
+  /** En la ficha de un lugar (escritorio) el buscador no está: se vuelve a la lista. */
+  function irAlBuscador(e: React.MouseEvent) {
+    e.preventDefault()
+    const enfocar = () => document.getElementById('buscador')?.focus()
+    if (document.getElementById('buscador')) return enfocar()
+    setPestana('lugares')
+    elegir(null)
+    window.setTimeout(enfocar, 0)
+  }
+
   function usarMiUbicacion() {
     setOrigen('ubicacion')
     ubic.solicitar()
@@ -318,13 +346,21 @@ export default function App() {
     () => lugares.filter((l) => l.descripcion?.startsWith('Estación del Metro')).length,
     [lugares],
   )
-  // Accesos rápidos de la barra (escritorio): escuelas con siglas de uso común.
+  // Accesos rápidos a escuelas con siglas de uso común (barra en escritorio, panel en móvil).
   const atajos = useMemo(
-    () => lugares.filter((l) => l.categoria === 'escuela' && l.alias?.length).slice(0, 6),
+    () => lugares.filter((l) => l.categoria === 'escuela' && l.alias?.length).slice(0, 8),
     [lugares],
   )
   const clima = enVivo.clima.estado.fase === 'listo' ? enVivo.clima.estado.datos : null
   const aire = enVivo.aire.estado.fase === 'listo' ? enVivo.aire.estado.datos : null
+
+  const cifras = (
+    <div className="grid grid-cols-3 gap-2">
+      <Cifra valor={lugares.length} texto="lugares en el mapa" />
+      <Cifra valor={nMetro} texto="estaciones de Metro cerca" />
+      <Cifra valor={conteoDe('acceso')} texto="accesos mapeados" />
+    </div>
+  )
 
   const buscador = (
     <Buscador
@@ -333,36 +369,26 @@ export default function App() {
       onElegir={alElegirDeBuscador}
       enLinea={escritorio}
       flotante={!escritorio}
-      placeholder={escritorio ? undefined : 'Buscar lugar…'}
+      listaAncha={!escritorio}
+      idEntrada="buscador"
+      placeholder={escritorio ? undefined : angosta ? 'Buscar…' : 'Buscar lugar…'}
       className={escritorio ? '' : 'min-w-0 flex-1'}
     />
   )
 
   return (
     <div className="app relative h-full overflow-hidden" data-hoja={hoja}>
-      <main className="absolute inset-0">
-        <Suspense
-          fallback={
-            <p role="status" className="sr-only">
-              Cargando mapa…
-            </p>
-          }
-        >
-          <Mapa
-            campus={campus}
-            limite={limite}
-            lugares={visibles}
-            seleccionado={seleccionado}
-            onSeleccionar={alSeleccionarEnMapa}
-            ubicacion={ubic.ubicacion}
-            ruta={rutaGeo}
-            obtenerRelleno={obtenerRelleno}
-          />
-        </Suspense>
-      </main>
 
       {/* Barra superior flotante */}
       <header className="pointer-events-none absolute inset-x-3 top-3 z-30 flex flex-wrap items-center gap-2 *:pointer-events-auto desk:inset-x-3.5 desk:top-3.5 desk:gap-2.5">
+        {/* Primer elemento con Tab: salta la barra y el panel hasta el buscador. */}
+        <a
+          href="#buscador"
+          onClick={irAlBuscador}
+          className="sr-only z-50 rounded-control bg-ink px-4 py-3 font-semibold text-on-ink focus:not-sr-only focus:absolute focus:left-0 focus:top-0"
+        >
+          Ir al buscador
+        </a>
         <div className="flotante flex h-control items-center gap-2.5 rounded-card p-2 desk:pr-4">
           <span className="flex size-9 items-center justify-center rounded-control bg-primary text-on-primary">
             <Icono nombre="ruta" tam={20} />
@@ -380,7 +406,7 @@ export default function App() {
               onCambiar={cambiarCampus}
               className="flotante"
             />
-            <nav aria-label="Ir a" className="flex min-w-0 flex-1 gap-2 overflow-hidden">
+            <nav aria-label="Ir a una escuela" className="desliza flex min-w-0 flex-1 gap-2 pr-8">
               {atajos.map((l) => (
                 <Boton
                   key={l.id}
@@ -399,7 +425,7 @@ export default function App() {
         )}
 
         <div className="order-last flex basis-full desk:order-none desk:basis-auto">
-          <NoticeBanner />
+          <NoticeBanner compacto={!escritorio && avisoVisto} />
         </div>
 
         <Boton
@@ -408,11 +434,10 @@ export default function App() {
             setPestana('hoy')
             setHoja('max')
           }}
-          className="h-control shrink-0 rounded-card px-3 desk:px-4"
+          className="h-control shrink-0 gap-1.5! rounded-card px-2.5! desk:gap-2! desk:px-4!"
         >
-          <span className="hidden desk:inline-flex">
-            <Icono nombre="nube" tam={20} />
-          </span>
+          {/* En pantallas de 320 px se omite el ícono para que quepa el buscador. */}
+          {!angosta && <Icono nombre="nube" tam={escritorio ? 20 : 18} />}
           {/* El nombre accesible incluye el texto visible (control por voz: «pulsa 15°»). */}
           <span className="sr-only">Hoy en el campus:</span>
           <span className="font-display text-body font-semibold">
@@ -516,12 +541,27 @@ export default function App() {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <Cifra valor={lugares.length} texto="lugares en el mapa" />
-                <Cifra valor={nMetro} texto="estaciones de Metro cerca" />
-                <Cifra valor={conteoDe('acceso')} texto="accesos mapeados" />
-              </div>
+              {/* Móvil: atajos a escuelas (en escritorio están en la barra superior). */}
+              {!escritorio && atajos.length > 0 && (
+                <nav
+                  aria-label="Ir a una escuela"
+                  className="desliza -mx-4 flex shrink-0 gap-2 px-4 pr-8"
+                >
+                  {atajos.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => mostrarLugar(l.id)}
+                      title={l.nombre}
+                      className="min-h-touch shrink-0 rounded-pill border border-border bg-surface px-4 text-small font-semibold"
+                    >
+                      {l.alias![0]}
+                    </button>
+                  ))}
+                </nav>
+              )}
 
+              {escritorio && cifras}
               {escritorio && buscador}
 
               <div className="flex flex-col gap-2">
@@ -569,6 +609,9 @@ export default function App() {
                 </div>
               )}
 
+              {/* En móvil las cifras van después de lo que más se usa (escuelas y categorías). */}
+              {!escritorio && cifras}
+
               <p className="mt-auto border-t border-border pt-3 text-mini leading-relaxed text-muted">
                 {DISCLAIMER_TEXT} Lugares tomados de OpenStreetMap, sin verificar en
                 campo.
@@ -611,6 +654,28 @@ export default function App() {
           </>
         )}
       </Panel>
+
+      {/* El mapa va al final del documento: con Tab se llega antes a la barra y al panel. */}
+      <main className="absolute inset-0">
+        <Suspense
+          fallback={
+            <p role="status" className="sr-only">
+              Cargando mapa…
+            </p>
+          }
+        >
+          <Mapa
+            campus={campus}
+            limite={limite}
+            lugares={visibles}
+            seleccionado={seleccionado}
+            onSeleccionar={alSeleccionarEnMapa}
+            ubicacion={ubic.ubicacion}
+            ruta={rutaGeo}
+            obtenerRelleno={obtenerRelleno}
+          />
+        </Suspense>
+      </main>
     </div>
   )
 }
