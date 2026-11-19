@@ -3,18 +3,22 @@
   "name": "rutapoli-ocupacion",
   "main": "src/index.ts",
   "compatibility_date": "2025-09-01",
+  // Dirección pública: https://rutapoli-ocupacion.rutapoli.workers.dev
+  "workers_dev": true,
+  "preview_urls": false,
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "rutapoli-ocupacion",
-      // Reemplaza con el id real que imprime `wrangler d1 create rutapoli-ocupacion`.
-      // Para pruebas locales (--local) basta este valor de relleno.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      // Base de producción (creada con `wrangler d1 create rutapoli-ocupacion`).
+      // Las pruebas locales (--local) usan una copia aparte en .wrangler/, no esta.
+      "database_id": "ebabed8e-83bd-476b-8c37-958b9bf4e044",
     },
   ],
   "vars": {
-    // Orígenes que pueden llamar a la API (separados por coma). Agrega el dominio de producción.
-    "ORIGENES_PERMITIDOS": "http://localhost:5173,http://localhost:4173",
+    // Orígenes que pueden llamar a la API (separados por coma). En desarrollo se sobrescribe
+    // desde worker/.dev.vars con los de localhost (ver README).
+    "ORIGENES_PERMITIDOS": "https://rutapoli.pages.dev",
   },
   // Cada día borra reportes de más de 24 h.
   "triggers": { "crons": ["17 3 * * *"] },

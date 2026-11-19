@@ -225,15 +225,20 @@ Conviene publicar un aviso de privacidad propio antes de abrir la función al p�
 #### Probar en local
 
 ```bash
-echo "SAL_SECRETA=cualquier-texto-local" > worker/.dev.vars   # no se sube a git
+printf "SAL_SECRETA=cualquier-texto-local\nORIGENES_PERMITIDOS=http://localhost:5173,http://localhost:4173\n" > worker/.dev.vars   # no se sube a git
 npm run worker:esquema-local     # crea las tablas en la D1 local
 npm run worker:dev               # Worker en http://localhost:8787
 echo "VITE_API_OCUPACION=http://localhost:8787" > .env.local
 npm run dev                      # reinicia Vite para que lea .env.local
 ```
 
+**En producción:** `https://rutapoli-ocupacion.rutapoli.workers.dev` (base D1 `rutapoli-ocupacion`; limpieza
+diaria a las 03:17 UTC). Pruebas rápidas: `GET /api/salud` → `{"ok":true}`; `GET /api/ocupacion`.
+
 #### Publicar el Worker (necesita una cuenta de Cloudflare)
 
+0. La primera vez, la cuenta necesita un subdominio `workers.dev`: ejecuta el paso 4 en tu terminal y responde
+   que sí cuando Wrangler lo pregunte (el enlace de registro del panel puede dar 404).
 1. `npx wrangler d1 create rutapoli-ocupacion` y copia el `database_id` a `worker/wrangler.jsonc`.
 2. `npx wrangler d1 execute rutapoli-ocupacion --remote --file=worker/schema.sql`
 3. `npx wrangler secret put SAL_SECRETA --config worker/wrangler.jsonc` (un texto largo y aleatorio).
